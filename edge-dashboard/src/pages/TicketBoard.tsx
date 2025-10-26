@@ -193,6 +193,19 @@ export default function TicketBoard() {
                 <span className="text-purple-400 font-mono">#{ticket.github_issue_number}</span>
               </div>
             )}
+            {ticket.github_repo_url && (
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Repository:</span>
+                <a 
+                  href={ticket.github_repo_url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-cyan-400 hover:text-cyan-300 text-xs underline"
+                >
+                  {ticket.github_repo_url.replace('https://github.com/', '')}
+                </a>
+              </div>
+            )}
           </div>
         )}
         

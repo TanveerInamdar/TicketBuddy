@@ -9,6 +9,7 @@ export interface Ticket {
   updatedAt: string
   github_pr_number: number | null
   github_issue_number: number | null
+  github_repo_url: string | null
 }
 
 export interface CreateTicketRequest {

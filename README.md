@@ -71,10 +71,10 @@ cd edge-dashboard
 npm install
 
 # Start development server
-npm run dev
+npm run dev -- --port 5176
 ```
 
-Frontend will be available at `http://localhost:5173`
+Frontend will be available at `http://localhost:5176`
 
 ## 🎯 Usage
 

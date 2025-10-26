@@ -9,8 +9,8 @@
 function corsHeaders(origin: string): Record<string, string> {
 	return {
 		'access-control-allow-origin': origin,
-		'access-control-allow-methods': 'GET,POST,PATCH,OPTIONS',
-		'access-control-allow-headers': 'content-type,authorization',
+		'access-control-allow-methods': 'GET,POST,PATCH,DELETE,OPTIONS',
+		'access-control-allow-headers': 'content-type,authorization,cache-control',
 		'cache-control': 'no-store'
 	};
 }
@@ -59,6 +59,55 @@ async function ghGet(env: Env, path: string) {
 	}
 	
 	return response;
+}
+
+/**
+ * Auto-create tickets from GitHub issues (preventing duplicates)
+ */
+async function autoCreateTicketsFromIssues(env: Env, issues: any[], repoUrl: string) {
+	try {
+		console.log(`Auto-creating tickets for ${issues.length} issues from ${repoUrl}`);
+		
+		for (const issue of issues) {
+			// Check if a ticket already exists for this issue
+			const existingTicket = await env.DB.prepare(
+				`SELECT id FROM tickets 
+				WHERE github_issue_number = ? AND github_repo_url = ?`
+			).bind(issue.id, repoUrl).first();
+			
+			if (existingTicket) {
+				console.log(`Ticket already exists for issue #${issue.id}, skipping`);
+				continue;
+			}
+			
+			// Create a new ticket for this issue
+			const ticketId = crypto.randomUUID();
+			const now = new Date().toISOString();
+			
+			await env.DB.prepare(
+				`INSERT INTO tickets (
+					id, name, description, importance, status, assignee, 
+					createdAt, updatedAt, github_issue_number, github_repo_url
+				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+			).bind(
+				ticketId,
+				issue.title,
+				`GitHub Issue #${issue.id} from ${repoUrl}\n\nAuthor: ${issue.author}\nURL: ${issue.html_url}`,
+				2, // medium importance by default
+				'open',
+				null,
+				now,
+				now,
+				issue.id,
+				repoUrl
+			).run();
+			
+			console.log(`Created ticket ${ticketId} for issue #${issue.id}`);
+		}
+	} catch (error) {
+		console.error('Failed to auto-create tickets:', error);
+		// Don't throw - this is non-blocking
+	}
 }
 
 /**
@@ -162,8 +211,11 @@ export default {
 		const url = new URL(request.url);
 		const origin = request.headers.get('origin') || '*';
 		
+		console.log(`[${request.method}] ${url.pathname} - Origin: ${origin}`);
+		
 		// Handle CORS preflight
 		if (request.method === 'OPTIONS') {
+			console.log(`OPTIONS preflight for ${url.pathname}`);
 			return new Response(null, {
 				status: 204,
 				headers: corsHeaders(origin)
@@ -230,22 +282,24 @@ export default {
 						return json({ error: 'Either repo or url must be provided' }, 400, origin);
 					}
 					
-					// Fetch repository details from GitHub API
-					const response = await ghGet(env, `/repos/${repoId}`);
-					const repoData = await response.json() as {
-						full_name: string;
-						html_url: string;
-						default_branch: string;
-					};
-					
-					const now = new Date().toISOString();
-					
-					// Upsert into database
-					await env.DB.prepare(
-						`INSERT INTO github_repos (id, url, default_branch, connected_at) 
-						VALUES (?, ?, ?, ?) 
-						ON CONFLICT(id) DO UPDATE SET url = ?, default_branch = ?, connected_at = ?`
-					).bind(repoId, repoData.html_url, repoData.default_branch, now, repoData.html_url, repoData.default_branch, now).run();
+			// Fetch repository details from GitHub API
+			const response = await ghGet(env, `/repos/${repoId}`);
+			const repoData = await response.json() as {
+				full_name: string;
+				html_url: string;
+				default_branch: string;
+			};
+			
+			const now = new Date().toISOString();
+			
+			// Delete any existing repos (we only support one)
+			await env.DB.prepare('DELETE FROM github_repos').run();
+			
+			// Insert the new repo
+			await env.DB.prepare(
+				`INSERT INTO github_repos (id, url, default_branch, connected_at) 
+				VALUES (?, ?, ?, ?)`
+			).bind(repoId, repoData.html_url, repoData.default_branch, now).run();
 					
 					return json({
 						success: true,
@@ -258,11 +312,29 @@ export default {
 						success: false,
 						error: (error as Error).message
 					}, 500, origin);
-				}
+		}
+		}
+		
+		// Route: DELETE /github/link - Unlink the currently connected GitHub repository
+		if (request.method === 'DELETE' && url.pathname === '/github/link') {
+			try {
+				// Delete all linked repos (we only support one now)
+				await env.DB.prepare('DELETE FROM github_repos').run();
+				
+				return json({
+					success: true,
+					message: 'Repository unlinked successfully'
+				}, 200, origin);
+			} catch (error) {
+				return json({
+					success: false,
+					error: (error as Error).message
+				}, 500, origin);
 			}
-			
-			// Route: GET /github/summary - Get GitHub integration summary
-			if (request.method === 'GET' && url.pathname === '/github/summary') {
+		}
+		
+		// Route: GET /github/summary - Get GitHub integration summary
+		if (request.method === 'GET' && url.pathname === '/github/summary') {
 				try {
 					const repos = await env.DB.prepare(
 						'SELECT * FROM github_repos ORDER BY connected_at DESC LIMIT 1'
@@ -379,6 +451,11 @@ export default {
 				const ghIssues = await ghGet(env, `/repos/${repoId}/issues?state=${state}&per_page=100`);
 				const issuesData = await ghIssues.json() as any[];
 				
+				// Get repo URL from the database
+				const repoResult = await env.DB.prepare('SELECT url FROM github_repos WHERE id = ?')
+					.bind(repoId).first() as any;
+				const repoUrl = repoResult?.url || `https://github.com/${repoId}`;
+				
 				// Transform to simpler format
 				const issues = issuesData.map((issue: any) => ({
 					id: issue.number,
@@ -400,6 +477,11 @@ export default {
 						const issueLabels = issuesData.find((i: any) => i.number === issue.id)?.labels || [];
 						return issueLabels.some((label: any) => labelList.includes(label.name.toLowerCase()));
 					});
+				}
+				
+				// Auto-create tickets for open issues (non-blocking)
+				if (state === 'open') {
+					ctx.waitUntil(autoCreateTicketsFromIssues(env, filteredIssues, repoUrl));
 				}
 				
 				return json({ issues: filteredIssues }, 200, origin);
@@ -866,50 +948,109 @@ export default {
 					- If it's a single feature, create one ticket
 					- Be specific and actionable for each ticket
 					
-					Request: "${body.description}"`;
-					
-					const aiResponse = await env.AI.run('@cf/meta/llama-2-7b-chat-int8', {
-						prompt
-					});
-					
-					// Parse AI response and create tickets
-					let tickets = [];
-					
-					try {
-						// Try to parse the AI response as JSON
-						const responseText = typeof aiResponse === 'string' ? aiResponse : aiResponse.response || '';
-						const aiTickets = JSON.parse(responseText);
-						
-						if (Array.isArray(aiTickets) && aiTickets.length > 0) {
-							tickets = aiTickets;
-						} else {
-							throw new Error('Invalid AI response format');
+			Request: "${body.description}"`;
+			
+			let tickets = [];
+			
+			try {
+				const aiResponse = await env.AI.run('@cf/meta/llama-2-7b-chat-int8', {
+					messages: [
+						{
+							role: 'system',
+							content: `You are a ticket management assistant. Analyze requests and create tickets with appropriate priority levels.
+
+IMPORTANCE LEVELS (1-3):
+- 3 = High urgency: Time-sensitive, needs immediate attention, affects many users, system failures
+- 2 = Medium: Important work but can be scheduled, regular features and improvements  
+- 1 = Low priority: Nice-to-haves, minor improvements, optional features
+
+PRIORITY GUIDELINES:
+- Consider TIME CONSTRAINTS: "within X hours", "today", "this week" = higher priority
+- Consider IMPACT: System outages, security issues, payment problems = highest priority
+- Consider LANGUAGE TONE: Casual requests ("maybe add", "when possible") = lower priority
+- Consider USER URGENCY: Words expressing urgency increase priority naturally
+
+RESPONSE FORMAT (JSON ONLY - NO EXTRA TEXT):
+[
+  {
+    "name": "Short descriptive title",
+    "description": "Detailed description of the work needed",
+    "importance": 1 | 2 | 3,
+    "assignee": "John Doe" | "Sarah Wilson" | "Mike Johnson"
+  }
+]
+
+EXAMPLES:
+"Need this fixed within 1 hour" → importance: 3 (time constraint)
+"Site is completely down" → importance: 3 (critical system failure)
+"Can we add dark mode sometime?" → importance: 1 (casual, no urgency)
+"Implement user authentication" → importance: 2 (important but no emergency)
+
+CRITICAL: Output ONLY valid JSON. No explanations before or after.`
+						},
+						{
+							role: 'user',
+							content: prompt
 						}
-					} catch (parseError) {
-						console.log('AI response parsing failed, using fallback logic');
+					]
+				});
+					
+				// Get the text response (it's in response.response)
+				let aiText = aiResponse.response || '';
+				console.log('AI Response:', aiText);
+				
+				// Try to extract JSON array from response (in case AI adds extra text)
+				const jsonMatch = aiText.match(/\[\s*\{[\s\S]*\}\s*\]/);
+				if (jsonMatch) {
+					aiText = jsonMatch[0];
+				}
+				
+				// Try to parse the AI response as JSON
+				const aiTickets = JSON.parse(aiText);
+				
+				if (Array.isArray(aiTickets) && aiTickets.length > 0) {
+					tickets = aiTickets;
+					console.log(`✅ AI parsed ${tickets.length} tickets successfully!`);
+				} else {
+					throw new Error('Invalid AI response format');
+				}
+			} catch (aiError) {
+				console.log('AI processing failed:', aiError);
 						
 						// Fallback: Use keyword-based analysis to break down the request
 						const description = body.description.toLowerCase();
 						
-						// Smart priority detection
+						// Smart priority detection with enhanced urgency detection
 						const calculateImportance = (keywords: string[], text: string): number => {
-							// High priority indicators
-							if (/urgent|critical|emergency|asap|blocking|security|vulnerability|breach|payment|transaction|data loss|crashes|errors/.test(text)) {
+							// CRITICAL: Time constraints and urgent keywords (HIGH priority)
+							if (/urgent|critical|emergency|asap|immediately|now|right away|within (an? )?(hour|day|minute)|today|this (morning|afternoon)|by (eod|end of day)|hotfix|blocking|blocker/.test(text)) {
 								return 3;
 							}
-							// Medium priority indicators
-							if (/important|soon|priority|core|essential|must have/.test(text)) {
+							// CRITICAL: System failures and security (HIGH priority)
+							if (/down|not working|broken|failing|crashed|security|vulnerability|breach|hack|exploit|exposed|leak/.test(text)) {
+								return 3;
+							}
+							// CRITICAL: Financial and data issues (HIGH priority)
+							if (/payment|transaction|billing|charge|refund|data loss|database down|cannot access/.test(text)) {
+								return 3;
+							}
+							// MEDIUM: Important but not urgent
+							if (/important|soon|priority|should|need|must have|implement|core|essential/.test(text)) {
 								return 2;
+							}
+							// LOW: Optional and nice-to-haves
+							if (/maybe|consider|eventually|when possible|nice to have|optional|if time|polish/.test(text)) {
+								return 1;
 							}
 							// Security/auth always high
 							if (keywords.some(k => /auth|security|login|password|encrypt|ssl|cert/.test(k))) {
 								return 3;
 							}
-							// Core features medium-high
+							// Core features medium
 							if (keywords.some(k => /api|backend|database|server|core|feature/.test(k))) {
 								return 2;
 							}
-							// UI/frontend usually low-medium
+							// UI/frontend usually low unless urgent
 							if (keywords.some(k => /ui|design|style|animation|polish|frontend/.test(k))) {
 								return 1;
 							}
@@ -1014,46 +1155,40 @@ export default {
 							createdAt: now,
 							updatedAt: now
 						});
-					}
-					
-					return json({ 
-						success: true,
-						tickets: createdTickets,
-						count: createdTickets.length
-					});
-					
-				} catch (aiError) {
-					console.error('AI processing failed, using fallback:', aiError);
-					
-					// Ultimate fallback: create a single ticket
-					const fallbackId = "TICKET-" + Date.now().toString().slice(-6);
-					const fallbackName = "AI-Generated Request";
-					const fallbackImportance = 1;
-					const fallbackAssignee = "John Doe";
-					
-					await env.DB.prepare(
-						'INSERT INTO tickets (id, name, description, importance, status, assignee, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-					).bind(fallbackId, fallbackName, body.description, fallbackImportance, 'open', fallbackAssignee, now, now).run();
-					
-					return json({ 
-						success: true,
-						tickets: [{
-							id: fallbackId,
-							name: fallbackName,
-							description: body.description,
-							importance: fallbackImportance,
-							status: 'open',
-							assignee: fallbackAssignee,
-							createdAt: now,
-							updatedAt: now
-						}],
-						count: 1
-					});
 				}
-			}
+				
+			return json({ 
+				success: true,
+				tickets: createdTickets,
+				count: createdTickets.length
+			});
+		} catch (error) {
+			console.error('AI processing failed:', error);
+			// Fallback: create single ticket
+			const fallbackId = "TICKET-" + Date.now().toString().slice(-6);
+			await env.DB.prepare(
+				'INSERT INTO tickets (id, name, description, importance, status, assignee, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+			).bind(fallbackId, "AI-Generated Request", body.description, 1, 'open', "John Doe", now, now).run();
+			
+			return json({ 
+				success: true,
+				tickets: [{
+					id: fallbackId,
+					name: "AI-Generated Request",
+					description: body.description,
+					importance: 1,
+					status: 'open',
+					assignee: "John Doe",
+					createdAt: now,
+					updatedAt: now
+				}],
+				count: 1
+			});
+		}
+	}
 
-		// Route: PATCH /tickets/:id
-		if (request.method === 'PATCH' && url.pathname.startsWith('/tickets/')) {
+	// Route: PATCH /tickets/:id
+	if (request.method === 'PATCH' && url.pathname.startsWith('/tickets/')) {
 			const ticketId = url.pathname.split('/').pop();
 			const body = await request.json() as { status?: string; importance?: number };
 			const now = new Date().toISOString();

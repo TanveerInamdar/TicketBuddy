@@ -59,12 +59,27 @@ export default function GitHubIntegration() {
   const [selectedPR, setSelectedPR] = useState<PullRequest | null>(null)
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [selectedTicketId, setSelectedTicketId] = useState<string>('')
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
   const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8787'
 
   useEffect(() => {
     fetchSummary()
     fetchTickets()
+
+    // Refetch when tab becomes visible
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchSummary()
+        if (summary?.connected && summary.repo) {
+          fetchData()
+        }
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [])
 
   useEffect(() => {
@@ -73,15 +88,51 @@ export default function GitHubIntegration() {
     }
   }, [activeTab, summary])
 
+  const refreshData = async () => {
+    await fetchSummary()
+    if (summary?.connected && summary.repo) {
+      await fetchData()
+    }
+    await fetchTickets()
+  }
+
   const fetchSummary = async () => {
     try {
-      const response = await fetch(`${API_BASE}/github/summary`)
+      setIsLoading(true)
+      setLoadError(null)
+      console.log('Fetching summary from:', `${API_BASE}/github/summary`)
+      const response = await fetch(`${API_BASE}/github/summary`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' }
+      })
+      console.log('Summary response status:', response.status)
       if (response.ok) {
         const data = await response.json()
+        console.log('Summary data:', data)
         setSummary(data)
+      } else {
+        const errorText = await response.text()
+        setLoadError(`Failed to fetch summary: ${response.status} ${errorText}`)
+        // Set a default empty summary so the page doesn't hang
+        setSummary({
+          connected: false,
+          repo: null,
+          counts: { openPRs: 0, openIssues: 0 },
+          recentEvents: []
+        })
       }
     } catch (error) {
       console.error('Failed to fetch summary:', error)
+      setLoadError(`Network error: ${(error as Error).message}`)
+      // Set a default empty summary so the page doesn't hang
+      setSummary({
+        connected: false,
+        repo: null,
+        counts: { openPRs: 0, openIssues: 0 },
+        recentEvents: []
+      })
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -135,17 +186,22 @@ export default function GitHubIntegration() {
     const repoId = summary.repo.id
     const [owner, name] = repoId.split('/')
 
+    const fetchOptions = {
+      cache: 'no-store' as RequestCache,
+      headers: { 'Cache-Control': 'no-cache' }
+    }
+
     try {
       if (activeTab === 'prs') {
-        const response = await fetch(`${API_BASE}/github/${owner}/${name}/prs?state=open`)
+        const response = await fetch(`${API_BASE}/github/${owner}/${name}/prs?state=open`, fetchOptions)
         const data = await response.json()
         setPrs(data.prs || [])
       } else if (activeTab === 'issues') {
-        const response = await fetch(`${API_BASE}/github/${owner}/${name}/issues?state=open`)
+        const response = await fetch(`${API_BASE}/github/${owner}/${name}/issues?state=open`, fetchOptions)
         const data = await response.json()
         setIssues(data.issues || [])
       } else {
-        const response = await fetch(`${API_BASE}/github/${owner}/${name}/events?limit=20`)
+        const response = await fetch(`${API_BASE}/github/${owner}/${name}/events?limit=20`, fetchOptions)
         const data = await response.json()
         setEvents(data.events || [])
       }
@@ -245,13 +301,67 @@ export default function GitHubIntegration() {
     }
   }
 
-  if (!summary) {
+  const unlinkRepo = async () => {
+    if (!confirm('Are you sure you want to unlink this repository?')) return
+
+    try {
+      const response = await fetch(`${API_BASE}/github/link`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        setSummary({
+          connected: false,
+          repo: null,
+          counts: { openPRs: 0, openIssues: 0 },
+          recentEvents: []
+        })
+        setPrs([])
+        setIssues([])
+        setEvents([])
+      } else {
+        alert('Failed to unlink repository')
+      }
+    } catch (error) {
+      console.error('Failed to unlink:', error)
+      alert('Failed to unlink repository')
+    }
+  }
+
+  if (isLoading) {
     return <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div></div>
+  }
+
+  if (!summary) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-slate-100">GitHub Integration</h1>
+        <div className="bg-red-900/20 border border-red-500 rounded-lg p-6">
+          <h2 className="text-xl font-semibold text-red-400 mb-2">Error Loading GitHub Integration</h2>
+          <p className="text-slate-300">{loadError || 'Failed to load GitHub integration. Please try refreshing the page.'}</p>
+          <button
+            onClick={() => {
+              setIsLoading(true)
+              fetchSummary()
+            }}
+            className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-slate-100">GitHub Integration</h1>
+      
+      {loadError && (
+        <div className="bg-yellow-900/20 border border-yellow-500 rounded-lg p-4">
+          <p className="text-yellow-300">{loadError}</p>
+        </div>
+      )}
 
       {!summary.connected ? (
         <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
@@ -278,10 +388,18 @@ export default function GitHubIntegration() {
           {/* Summary Card */}
           <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
             <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-xl font-semibold">{summary.repo.id}</h2>
-                <a href={summary.repo.url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 text-sm">
-                  {summary.repo.url}
+              <div className="flex-1">
+                <div className="flex items-center gap-3">
+                  <h2 className="text-xl font-semibold">{summary.repo?.id}</h2>
+                  <button
+                    onClick={unlinkRepo}
+                    className="text-xs px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                  >
+                    Change Repository
+                  </button>
+                </div>
+                <a href={summary.repo?.url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 text-sm">
+                  {summary.repo?.url}
                 </a>
               </div>
               <div className="flex gap-4 text-sm">
@@ -299,21 +417,22 @@ export default function GitHubIntegration() {
 
           {/* Tabs */}
           <div className="bg-slate-800 rounded-lg border border-slate-700">
-            <div className="border-b border-slate-700 flex gap-1 p-2">
-              <button
-                onClick={() => setActiveTab('prs')}
-                className={`px-4 py-2 rounded-lg transition-colors ${
-                  activeTab === 'prs' ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-700'
-                }`}
-              >
-                Pull Requests
-              </button>
-              <button
-                onClick={() => setActiveTab('issues')}
-                className={`px-4 py-2 rounded-lg transition-colors ${
-                  activeTab === 'issues' ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-700'
-                }`}
-              >
+            <div className="border-b border-slate-700 flex justify-between items-center p-2">
+              <div className="flex gap-1">
+                <button
+                  onClick={() => setActiveTab('prs')}
+                  className={`px-4 py-2 rounded-lg transition-colors ${
+                    activeTab === 'prs' ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  Pull Requests
+                </button>
+                <button
+                  onClick={() => setActiveTab('issues')}
+                  className={`px-4 py-2 rounded-lg transition-colors ${
+                    activeTab === 'issues' ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
                 Issues
               </button>
               <button
@@ -323,6 +442,17 @@ export default function GitHubIntegration() {
                 }`}
               >
                 Events
+              </button>
+              </div>
+              <button
+                onClick={refreshData}
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-2"
+                title="Refresh data from GitHub"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Refresh
               </button>
             </div>
 

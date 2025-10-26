@@ -2,16 +2,284 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
+@layer utilities {
+  /* Grid Pattern Background */
+  .bg-grid-pattern {
+    background-image: 
+      linear-gradient(rgba(147, 197, 253, 0.1) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(147, 197, 253, 0.1) 1px, transparent 1px);
+    background-size: 50px 50px;
+  }
 
-#root {
-  min-height: 100vh;
-}
+  /* Radial Gradient */
+  .bg-gradient-radial {
+    background: radial-gradient(circle, var(--tw-gradient-stops));
+  }
 
+  /* Scanning Line Animations */
+  @keyframes scan-line {
+    0% {
+      top: 0%;
+      opacity: 0;
+    }
+    10% {
+      opacity: 1;
+    }
+    90% {
+      opacity: 1;
+    }
+    100% {
+      top: 100%;
+      opacity: 0;
+    }
+  }
+
+  .animate-scan-line {
+    animation: scan-line 4s linear infinite;
+  }
+
+  .animate-scan-line-delayed {
+    animation: scan-line 5s linear infinite;
+    animation-delay: 2s;
+  }
+
+  /* Floating Code */
+  @keyframes float-code {
+    0%, 100% {
+      transform: translateY(0) translateX(0);
+      opacity: 0.3;
+    }
+    50% {
+      transform: translateY(-30px) translateX(10px);
+      opacity: 0.6;
+    }
+  }
+
+  .animate-float-code {
+    animation: float-code 8s ease-in-out infinite;
+  }
+
+  /* Shooting Stars - Faster */
+  @keyframes shooting-star-fast {
+    0% {
+      transform: translateX(0) translateY(0);
+      opacity: 1;
+    }
+    70% {
+      opacity: 1;
+    }
+    100% {
+      transform: translateX(120vw) translateY(60vh);
+      opacity: 0;
+    }
+  }
+
+  .animate-shooting-star-fast {
+    animation: shooting-star-fast 2s linear infinite;
+  }
+
+  .animate-shooting-star-delayed {
+    animation: shooting-star-fast 2.5s linear infinite;
+    animation-delay: 1s;
+  }
+
+  .animate-shooting-star-delayed-2 {
+    animation: shooting-star-fast 2.2s linear infinite;
+    animation-delay: 1.5s;
+  }
+
+  /* Float Animations */
+  @keyframes float-slow {
+    0%, 100% {
+      transform: translateY(0px) translateX(0px) rotate(0deg);
+    }
+    50% {
+      transform: translateY(-30px) translateX(15px) rotate(5deg);
+    }
+  }
+
+  @keyframes float-slower {
+    0%, 100% {
+      transform: translateY(0px) translateX(0px) scale(1);
+    }
+    50% {
+      transform: translateY(-40px) translateX(-20px) scale(1.05);
+    }
+  }
+
+  .animate-float-slow {
+    animation: float-slow 10s ease-in-out infinite;
+  }
+
+  .animate-float-slower {
+    animation: float-slower 12s ease-in-out infinite;
+  }
+
+  /* Pulse Ring */
+  @keyframes pulse-ring {
+    0% {
+      box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.4);
+    }
+    50% {
+      box-shadow: 0 0 0 20px rgba(139, 92, 246, 0);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(139, 92, 246, 0);
+    }
+  }
+
+  .animate-pulse-ring {
+    animation: pulse-ring 2s ease-out infinite;
+  }
+
+  .animate-pulse-ring-delayed {
+    animation: pulse-ring 2s ease-out infinite;
+    animation-delay: 1s;
+  }
+
+  /* Glitch Star */
+  @keyframes glitch-star {
+    0%, 100% {
+      opacity: 0.2;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.5);
+    }
+  }
+
+  .animate-glitch-star {
+    animation: glitch-star 3s ease-in-out infinite;
+  }
+
+  /* Hover Float for Robot */
+  @keyframes hover-float {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+
+  .animate-hover-float {
+    animation: hover-float 3s ease-in-out infinite;
+  }
+
+  /* Thruster Animations */
+  @keyframes thruster-left {
+    0%, 100% {
+      opacity: 0.8;
+      transform: translateX(-2px) scaleY(1);
+    }
+    50% {
+      opacity: 1;
+      transform: translateX(-2px) scaleY(1.3);
+    }
+  }
+
+  @keyframes thruster-right {
+    0%, 100% {
+      opacity: 0.8;
+      transform: translateX(2px) scaleY(1);
+    }
+    50% {
+      opacity: 1;
+      transform: translateX(2px) scaleY(1.3);
+    }
+  }
+
+  .animate-thruster-left {
+    animation: thruster-left 0.3s ease-in-out infinite;
+  }
+
+  .animate-thruster-right {
+    animation: thruster-right 0.3s ease-in-out infinite;
+    animation-delay: 0.15s;
+  }
+
+  /* Scanning Ring */
+  @keyframes scan-ring {
+    0% {
+      transform: scale(0.8);
+      border-color: rgba(34, 211, 238, 0);
+    }
+    50% {
+      transform: scale(1.2);
+      border-color: rgba(34, 211, 238, 0.8);
+    }
+    100% {
+      transform: scale(0.8);
+      border-color: rgba(34, 211, 238, 0);
+    }
+  }
+
+  .animate-scan-ring {
+    animation: scan-ring 2s ease-in-out infinite;
+  }
+
+  /* Gradient Text Animation */
+  @keyframes gradient-text {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
+
+  .animate-gradient-text {
+    background-size: 200% auto;
+    animation: gradient-text 4s ease infinite;
+  }
+
+  /* Border Glow */
+  @keyframes border-glow {
+    0% {
+      opacity: 0.5;
+    }
+    50% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0.5;
+    }
+  }
+
+  .animate-border-glow {
+    animation: border-glow 3s ease-in-out infinite;
+  }
+
+  /* Pulse Slow */
+  @keyframes pulse-slow {
+    0%, 100% {
+      opacity: 0.3;
+    }
+    50% {
+      opacity: 0.6;
+    }
+  }
+
+  .animate-pulse-slow {
+    animation: pulse-slow 4s ease-in-out infinite;
+  }
+
+  /* Animation Delays */
+  .animation-delay-300 {
+    animation-delay: 0.3s;
+  }
+
+  .animation-delay-500 {
+    animation-delay: 0.5s;
+  }
+
+  .animation-delay-600 {
+    animation-delay: 0.6s;
+  }
+
+  /* Shimmer effect removed - using Tailwind's gradient utilities instead */
+}
