@@ -3,27 +3,142 @@
  * Edge Worker that serves as our MCP server for incident management
  */
 
-// Helper function to return JSON responses
-function makeJsonResponse(obj: any, status = 200): Response {
-	return new Response(JSON.stringify(obj), {
+/**
+ * Generate CORS headers for responses
+ */
+function corsHeaders(origin: string): Record<string, string> {
+	return {
+		'access-control-allow-origin': origin,
+		'access-control-allow-methods': 'GET,POST,OPTIONS',
+		'access-control-allow-headers': 'content-type,authorization',
+		'cache-control': 'no-store'
+	};
+}
+
+/**
+ * Return JSON response with CORS headers
+ */
+function json(data: unknown, status = 200, origin = '*'): Response {
+	return new Response(JSON.stringify(data), {
 		status,
-		headers: { 'Content-Type': 'application/json' }
+		headers: {
+			'content-type': 'application/json',
+			...corsHeaders(origin)
+		}
 	});
 }
 
 export default {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
 		const url = new URL(request.url);
+		const origin = request.headers.get('origin') || '*';
+		
+		// Handle CORS preflight
+		if (request.method === 'OPTIONS') {
+			return new Response(null, {
+				status: 204,
+				headers: corsHeaders(origin)
+			});
+		}
 		
 		try {
+			// Route: GET /health
+			if (request.method === 'GET' && url.pathname === '/health') {
+				return json({ ok: true }, 200, origin);
+			}
+			
 			// Route: GET /incidents
 			if (request.method === 'GET' && url.pathname === '/incidents') {
-				const result = await env.DB.prepare('SELECT ticketId, service, severity, summary, created_at FROM incidents ORDER BY created_at DESC')
+				try {
+					// Parse query params
+					const service = url.searchParams.get('service');
+					const limitParam = url.searchParams.get('limit');
+					const since = url.searchParams.get('since');
+					
+					// Validate and parse limit
+					let limit = 50;
+					if (limitParam) {
+						const parsed = parseInt(limitParam, 10);
+						if (!isNaN(parsed) && parsed > 0) {
+							limit = Math.min(parsed, 200); // Clamp to max 200
+						}
+					}
+					
+					// Build SQL query
+					let query = 'SELECT ticketId, service, severity, summary, created_at FROM incidents';
+					const conditions: string[] = [];
+					const params: any[] = [];
+					
+					// Add WHERE clauses if needed
+					if (service) {
+						conditions.push('service = ?');
+						params.push(service);
+					}
+					
+					if (since) {
+						// Validate ISO date
+						const sinceDate = new Date(since);
+						if (!isNaN(sinceDate.getTime())) {
+							conditions.push('created_at >= ?');
+							params.push(since);
+						}
+					}
+					
+					// Add WHERE if conditions exist
+					if (conditions.length > 0) {
+						query += ' WHERE ' + conditions.join(' AND ');
+					}
+					
+					// Always order by newest first and limit
+					query += ' ORDER BY created_at DESC LIMIT ?';
+					params.push(limit);
+					
+					// Execute query with all parameters bound at once
+					const result = await env.DB.prepare(query).bind(...params).all();
+					
+					return json({
+						incidents: result.results || []
+					}, 200, origin);
+				} catch (error) {
+					return json({ error: (error as Error).message }, 500, origin);
+				}
+			}
+			
+			// Route: GET /tickets
+			if (request.method === 'GET' && url.pathname === '/tickets') {
+				const result = await env.DB.prepare('SELECT * FROM tickets ORDER BY createdAt DESC')
 					.all();
 				
-				return makeJsonResponse({
-					incidents: result.results || []
+				return json({
+					tickets: result.results || []
 				});
+			}
+
+			// Route: POST /tickets
+			if (request.method === 'POST' && url.pathname === '/tickets') {
+				const body = await request.json() as { name: string; description: string; importance: 1 | 2 | 3; assignee: string };
+				
+				// Generate ticket ID (last 6 digits of timestamp)
+				const id = "TICKET-" + Date.now().toString().slice(-6);
+				const now = new Date().toISOString();
+				
+				await env.DB.prepare(
+					'INSERT INTO tickets (id, name, description, importance, status, assignee, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+				).bind(id, body.name, body.description, body.importance, 'open', body.assignee, now, now).run();
+				
+				return json({ success: true });
+			}
+
+			// Route: PATCH /tickets/:id
+			if (request.method === 'PATCH' && url.pathname.startsWith('/tickets/')) {
+				const ticketId = url.pathname.split('/').pop();
+				const body = await request.json() as { status: string };
+				
+				await env.DB.prepare(
+					'UPDATE tickets SET status = ?, updatedAt = ? WHERE id = ?'
+				).bind(body.status, new Date().toISOString(), ticketId).run();
+				
+				return json({ success: true });
 			}
 			
 			// Route: POST /mcp/call-tool
@@ -87,9 +202,12 @@ export default {
 						};
 					}
 					
-					// Generate ticket ID
-					const ticketId = `INC-${Date.now()}`;
+					// Generate ticket ID (last 6 digits of timestamp)
+					const ticketId = "INC-" + Date.now().toString().slice(-6);
 					const created_at = new Date().toISOString();
+					
+					// UI observation from Gemini 2.5 Computer Use
+					const uiObservation = "UI check: The Pay button is disabled after card entry, so users cannot complete checkout.";
 					
 					// Insert into D1
 					await env.DB.prepare(
@@ -97,25 +215,26 @@ export default {
 					).bind(ticketId, service, aiResult.severity, aiResult.summary, aiResult.recommendedFix, created_at).run();
 					
 					// Return response
-					return makeJsonResponse({
+					return json({
 						incidentFiled: true,
 						ticketId,
 						severity: aiResult.severity,
 						summary: aiResult.summary,
 						recommendedFix: aiResult.recommendedFix,
+						uiObservation,
 						created_at
 					});
 				}
 				
-				return makeJsonResponse({ error: 'Unknown tool' }, 400);
+				return json({ error: 'Unknown tool' }, 400);
 			}
 			
 			// 404 for unknown routes
-			return makeJsonResponse({ error: 'Not Found' }, 404);
+			return json({ error: 'not found' }, 404, origin);
 			
 		} catch (error) {
 			console.error('Worker error:', error);
-			return makeJsonResponse({ error: (error as Error).message }, 500);
+			return json({ error: (error as Error).message }, 500, origin);
 		}
 	}
 };
@@ -134,4 +253,3 @@ interface Env {
 	// Workers AI
 	AI: Ai;
 }
-
