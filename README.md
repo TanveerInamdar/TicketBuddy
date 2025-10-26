@@ -2,6 +2,31 @@
 
 A modern ticket management system with AI-powered creation, GitHub integration, and a cosmic Space Cowboy theme! Built for [RowdyHacks](https://rowdyhacks.org/).
 
+## ⚡ Quick Start (TL;DR)
+
+**Important**: You need **TWO terminal windows** running simultaneously!
+
+```bash
+# Terminal 1 - Backend (port 8787)
+cd edge-mcp-worker
+npm install
+# Create .dev.vars with GITHUB_TOKEN, GEMINI_API_KEY, GITHUB_WEBHOOK_SECRET
+npx wrangler d1 migrations apply INCIDENTS_DB --local
+npm run dev
+
+# Terminal 2 - Frontend (port 5176)
+cd edge-dashboard
+npm install
+# Create src/auth_config.json with Auth0 credentials
+npm run dev
+```
+
+**Open:** http://localhost:5176
+
+**Need API keys?** See [Step-by-step setup](#-complete-setup-guide) below for detailed instructions.
+
+---
+
 ## ✨ Features
 
 ### 🎫 Ticket Management
@@ -52,6 +77,11 @@ A modern ticket management system with AI-powered creation, GitHub integration, 
   - Google Gemini 2.5 Flash
 - **Authentication**: Auth0
 - **GitHub API**: REST API v3
+- **MCP Server**: Model Context Protocol for Claude Desktop integration
+
+### 🤖 Claude Desktop Integration (Optional)
+
+TicketBuddy can be used as an MCP server with Claude Desktop! This allows Claude to manage your tickets and GitHub integration directly. See [edge-mcp-server/README.md](edge-mcp-server/README.md) for setup instructions.
 
 ## 📋 Prerequisites
 
@@ -73,6 +103,8 @@ Before you begin, make sure you have:
 ---
 
 ## 🚀 Complete Setup Guide
+
+> **📝 Note**: Keep both backend and frontend running in **separate terminal windows** throughout development!
 
 ### Step 1: Clone the Repository
 
