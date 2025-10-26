@@ -5,10 +5,7 @@ import { CreateTicketRequest } from '../types/ticket'
 export default function TicketSubmission() {
   const navigate = useNavigate()
   const [formData, setFormData] = useState<CreateTicketRequest>({
-    name: '',
-    description: '',
-    importance: 1,
-    assignee: ''
+    description: ''
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle')
@@ -32,7 +29,7 @@ export default function TicketSubmission() {
 
       if (response.ok) {
         setSubmitStatus('success')
-        setFormData({ name: '', description: '', importance: 1, assignee: '' })
+        setFormData({ description: '' })
         // Redirect to ticket board after successful submission
         setTimeout(() => {
           setIsRedirecting(true)
@@ -49,11 +46,11 @@ export default function TicketSubmission() {
     }
   }
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const { name, value } = e.target
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'importance' ? parseInt(value) as 1 | 2 | 3 : value
+      [name]: value
     }))
   }
 
@@ -63,27 +60,10 @@ export default function TicketSubmission() {
         <h2 className="text-2xl font-bold mb-6 text-slate-100">Submit Functionality Request</h2>
         
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Ticket Name */}
-          <div>
-            <label htmlFor="name" className="block text-sm font-medium text-slate-300 mb-2">
-              Functionality Name *
-            </label>
-            <input
-              type="text"
-              id="name"
-              name="name"
-              value={formData.name}
-              onChange={handleChange}
-              required
-              className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Enter desired functionality name..."
-            />
-          </div>
-
           {/* Description */}
           <div>
             <label htmlFor="description" className="block text-sm font-medium text-slate-300 mb-2">
-              Description *
+              Describe Your Functionality Request *
             </label>
             <textarea
               id="description"
@@ -91,45 +71,13 @@ export default function TicketSubmission() {
               value={formData.description}
               onChange={handleChange}
               required
-              rows={4}
+              rows={6}
               className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-              placeholder="Describe the desired functionality in detail..."
+              placeholder="Describe the functionality you'd like to see implemented. Be as detailed as possible - our AI will analyze your request and automatically assign priority, create a title, and assign it to the appropriate team member..."
             />
-          </div>
-
-          {/* Importance Level */}
-          <div>
-            <label htmlFor="importance" className="block text-sm font-medium text-slate-300 mb-2">
-              Importance Level *
-            </label>
-            <select
-              id="importance"
-              name="importance"
-              value={formData.importance}
-              onChange={handleChange}
-              className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value={1}>1 - Low Priority</option>
-              <option value={2}>2 - Medium Priority</option>
-              <option value={3}>3 - High Priority</option>
-            </select>
-          </div>
-
-          {/* Assignee */}
-          <div>
-            <label htmlFor="assignee" className="block text-sm font-medium text-slate-300 mb-2">
-              Assignee *
-            </label>
-            <input
-              type="text"
-              id="assignee"
-              name="assignee"
-              value={formData.assignee}
-              onChange={handleChange}
-              required
-              className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Enter assignee name..."
-            />
+            <p className="mt-2 text-sm text-slate-400">
+              💡 Our AI will automatically analyze your request and fill in the title, priority level, and assignee based on your description.
+            </p>
           </div>
 
           {/* Submit Button */}
@@ -164,7 +112,7 @@ export default function TicketSubmission() {
                 Redirecting to ticket board...
               </div>
             ) : (
-              '✅ Functionality request submitted successfully! Redirecting to ticket board...'
+              '✅ Functionality request submitted! AI is processing your request and will assign priority, title, and team member. Redirecting to ticket board...'
             )}
           </div>
         )}

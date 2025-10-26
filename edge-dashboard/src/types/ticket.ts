@@ -1,19 +1,16 @@
 export interface Ticket {
   id: string
-  name: string
+  name: string | null
   description: string
-  importance: 1 | 2 | 3
+  importance: 1 | 2 | 3 | null
   status: 'open' | 'in-progress' | 'qa' | 'resolved'
-  assignee: string
+  assignee: string | null
   createdAt: string
   updatedAt: string
 }
 
 export interface CreateTicketRequest {
-  name: string
   description: string
-  importance: 1 | 2 | 3
-  assignee: string
 }
 
 export interface CreateTicketResponse {
