@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Ticket, CreateTicketRequest } from '../types/ticket'
+import { CreateTicketRequest } from '../types/ticket'
 
 export default function TicketSubmission() {
   const [formData, setFormData] = useState<CreateTicketRequest>({
@@ -52,13 +52,13 @@ export default function TicketSubmission() {
   return (
     <div className="max-w-2xl mx-auto">
       <div className="bg-slate-800 rounded-lg p-8 border border-slate-700">
-        <h2 className="text-2xl font-bold mb-6 text-slate-100">Submit New Ticket</h2>
+        <h2 className="text-2xl font-bold mb-6 text-slate-100">Submit Functionality Request</h2>
         
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Ticket Name */}
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-slate-300 mb-2">
-              Ticket Name *
+              Functionality Name *
             </label>
             <input
               type="text"
@@ -68,7 +68,7 @@ export default function TicketSubmission() {
               onChange={handleChange}
               required
               className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Enter ticket name..."
+              placeholder="Enter desired functionality name..."
             />
           </div>
 
@@ -85,7 +85,7 @@ export default function TicketSubmission() {
               required
               rows={4}
               className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-              placeholder="Describe the functionality or issue..."
+              placeholder="Describe the desired functionality in detail..."
             />
           </div>
 
@@ -139,7 +139,7 @@ export default function TicketSubmission() {
                 Submitting...
               </>
             ) : (
-              'Submit Ticket'
+              'Submit Functionality Request'
             )}
           </button>
         </form>
@@ -147,13 +147,13 @@ export default function TicketSubmission() {
         {/* Status Messages */}
         {submitStatus === 'success' && (
           <div className="mt-4 p-4 bg-green-500/20 border border-green-500/40 rounded-lg text-green-300">
-            ✅ Ticket submitted successfully!
+            ✅ Functionality request submitted successfully!
           </div>
         )}
         
         {submitStatus === 'error' && (
           <div className="mt-4 p-4 bg-red-500/20 border border-red-500/40 rounded-lg text-red-300">
-            ❌ Failed to submit ticket. Please try again.
+            ❌ Failed to submit functionality request. Please try again.
           </div>
         )}
       </div>
