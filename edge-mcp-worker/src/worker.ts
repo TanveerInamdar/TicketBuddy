@@ -122,19 +122,28 @@ export default {
 				const id = "TICKET-" + Date.now().toString().slice(-6);
 				const now = new Date().toISOString();
 				
-				// AI Processing - Generate name, importance, and assignee
-				let aiGeneratedName = null;
-				let aiGeneratedImportance = null;
-				let aiGeneratedAssignee = null;
-				
+				// AI Processing - Analyze description and generate multiple tickets
 				try {
-					// Use Workers AI to analyze the description
-					const prompt = `Analyze this functionality request and provide a JSON response with:
-					{
-						"name": "Short descriptive title (max 50 chars)",
-						"importance": 1-3 (1=low, 2=medium, 3=high),
-						"assignee": "Team member name (choose from: John Doe, Jane Smith, Mike Johnson, Sarah Wilson, Alex Chen, Maria Rodriguez)"
-					}
+					// Use Workers AI to analyze the description and break it into separate functionalities
+					const prompt = `Analyze this functionality request and break it down into separate, specific tickets. 
+					Return a JSON array where each object represents a distinct functionality that needs to be implemented.
+					
+					Format:
+					[
+						{
+							"name": "Short descriptive title (max 50 chars)",
+							"description": "Detailed description of this specific functionality",
+							"importance": 1-3 (1=low, 2=medium, 3=high),
+							"assignee": "Team member name (choose from: John Doe, Jane Smith, Mike Johnson, Sarah Wilson, Alex Chen, Maria Rodriguez)"
+						}
+					]
+					
+					Guidelines:
+					- Each ticket should represent ONE specific functionality
+					- If the request mentions multiple features, create separate tickets for each
+					- If it's a single feature, create one ticket
+					- Be specific and actionable for each ticket
+					- Consider the technical complexity and assign accordingly
 					
 					Request: "${body.description}"`;
 					
@@ -142,52 +151,157 @@ export default {
 						prompt
 					});
 					
-					// Parse AI response (simplified for MVP)
-					// For now, use fallback logic based on keywords
-					const description = body.description.toLowerCase();
+					// Parse AI response and create tickets
+					let tickets = [];
 					
-					// Generate name from first few words
-					const words = body.description.split(' ').slice(0, 6);
-					aiGeneratedName = words.join(' ').replace(/[^\w\s]/g, '');
-					
-					// Determine importance based on keywords
-					if (description.includes('urgent') || description.includes('critical') || description.includes('asap') || description.includes('emergency')) {
-						aiGeneratedImportance = 3;
-					} else if (description.includes('important') || description.includes('soon') || description.includes('priority')) {
-						aiGeneratedImportance = 2;
-					} else {
-						aiGeneratedImportance = 1;
+					try {
+						// Try to parse the AI response as JSON
+						const responseText = typeof aiResponse === 'string' ? aiResponse : aiResponse.response || '';
+						const aiTickets = JSON.parse(responseText);
+						
+						if (Array.isArray(aiTickets) && aiTickets.length > 0) {
+							tickets = aiTickets;
+						} else {
+							throw new Error('Invalid AI response format');
+						}
+					} catch (parseError) {
+						console.log('AI response parsing failed, using fallback logic');
+						
+						// Fallback: Use keyword-based analysis to break down the request
+						const description = body.description.toLowerCase();
+						
+						// Simple keyword-based breakdown
+						const functionalities = [];
+						
+						// Check for common functionality patterns
+						if (description.includes('authentication') || description.includes('login') || description.includes('auth')) {
+							functionalities.push({
+								name: "User Authentication System",
+								description: "Implement secure user authentication with login/logout functionality",
+								importance: description.includes('urgent') || description.includes('critical') ? 3 : 2,
+								assignee: "Sarah Wilson"
+							});
+						}
+						
+						if (description.includes('database') || description.includes('data') || description.includes('storage')) {
+							functionalities.push({
+								name: "Database Implementation",
+								description: "Set up and configure database for data storage and retrieval",
+								importance: description.includes('urgent') || description.includes('critical') ? 3 : 2,
+								assignee: "Mike Johnson"
+							});
+						}
+						
+						if (description.includes('frontend') || description.includes('ui') || description.includes('interface') || description.includes('design')) {
+							functionalities.push({
+								name: "Frontend Interface",
+								description: "Create user interface and frontend components",
+								importance: description.includes('urgent') || description.includes('critical') ? 3 : 1,
+								assignee: "Jane Smith"
+							});
+						}
+						
+						if (description.includes('api') || description.includes('backend') || description.includes('server')) {
+							functionalities.push({
+								name: "Backend API",
+								description: "Develop backend API and server-side functionality",
+								importance: description.includes('urgent') || description.includes('critical') ? 3 : 2,
+								assignee: "Mike Johnson"
+							});
+						}
+						
+						if (description.includes('mobile') || description.includes('app')) {
+							functionalities.push({
+								name: "Mobile Application",
+								description: "Develop mobile application functionality",
+								importance: description.includes('urgent') || description.includes('critical') ? 3 : 2,
+								assignee: "Alex Chen"
+							});
+						}
+						
+						// If no specific functionalities detected, create a general ticket
+						if (functionalities.length === 0) {
+							const words = body.description.split(' ').slice(0, 6);
+							const name = words.join(' ').replace(/[^\w\s]/g, '');
+							
+							functionalities.push({
+								name: name || "General Functionality Request",
+								description: body.description,
+								importance: description.includes('urgent') || description.includes('critical') || description.includes('asap') || description.includes('emergency') ? 3 : 
+										   description.includes('important') || description.includes('soon') || description.includes('priority') ? 2 : 1,
+								assignee: "John Doe"
+							});
+						}
+						
+						tickets = functionalities;
 					}
 					
-					// Assign based on keywords or random assignment
-					const teamMembers = null; 
+					// Create tickets in database
+					const createdTickets = [];
+					
+					for (let i = 0; i < tickets.length; i++) {
+						const ticket = tickets[i];
+						const ticketId = "TICKET-" + Date.now().toString().slice(-6) + "-" + (i + 1);
+						
+						await env.DB.prepare(
+							'INSERT INTO tickets (id, name, description, importance, status, assignee, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+						).bind(
+							ticketId, 
+							ticket.name, 
+							ticket.description, 
+							ticket.importance, 
+							'open', 
+							ticket.assignee, 
+							now, 
+							now
+						).run();
+						
+						createdTickets.push({
+							id: ticketId,
+							name: ticket.name,
+							description: ticket.description,
+							importance: ticket.importance,
+							status: 'open',
+							assignee: ticket.assignee,
+							createdAt: now,
+							updatedAt: now
+						});
+					}
+					
+					return json({ 
+						success: true,
+						tickets: createdTickets,
+						count: createdTickets.length
+					});
 					
 				} catch (aiError) {
 					console.error('AI processing failed, using fallback:', aiError);
-					// Fallback values if AI fails
-					aiGeneratedName = "AI-Generated Request";
-					aiGeneratedImportance = 1;
-					aiGeneratedAssignee = "John Doe";
+					
+					// Ultimate fallback: create a single ticket
+					const fallbackId = "TICKET-" + Date.now().toString().slice(-6);
+					const fallbackName = "AI-Generated Request";
+					const fallbackImportance = 1;
+					const fallbackAssignee = "John Doe";
+					
+					await env.DB.prepare(
+						'INSERT INTO tickets (id, name, description, importance, status, assignee, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+					).bind(fallbackId, fallbackName, body.description, fallbackImportance, 'open', fallbackAssignee, now, now).run();
+					
+					return json({ 
+						success: true,
+						tickets: [{
+							id: fallbackId,
+							name: fallbackName,
+							description: body.description,
+							importance: fallbackImportance,
+							status: 'open',
+							assignee: fallbackAssignee,
+							createdAt: now,
+							updatedAt: now
+						}],
+						count: 1
+					});
 				}
-				
-				// Insert ticket with AI-generated fields
-				await env.DB.prepare(
-					'INSERT INTO tickets (id, name, description, importance, status, assignee, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-				).bind(id, aiGeneratedName, body.description, aiGeneratedImportance, 'open', aiGeneratedAssignee, now, now).run();
-				
-				return json({ 
-					success: true,
-					ticket: {
-						id,
-						name: aiGeneratedName,
-						description: body.description,
-						importance: aiGeneratedImportance,
-						status: 'open',
-						assignee: aiGeneratedAssignee,
-						createdAt: now,
-						updatedAt: now
-					}
-				});
 			}
 
 			// Route: PATCH /tickets/:id

@@ -28,8 +28,13 @@ export default function TicketSubmission() {
       })
 
       if (response.ok) {
+        const result = await response.json()
         setSubmitStatus('success')
         setFormData({ description: '' })
+        
+        // Log the number of tickets created
+        console.log(`✅ Created ${result.count} ticket(s) from your request`)
+        
         // Redirect to ticket board after successful submission
         setTimeout(() => {
           setIsRedirecting(true)
@@ -73,10 +78,10 @@ export default function TicketSubmission() {
               required
               rows={6}
               className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-              placeholder="Describe the functionality you'd like to see implemented. Be as detailed as possible - our AI will analyze your request and automatically assign priority, create a title, and assign it to the appropriate team member..."
+              placeholder="Describe the functionality you'd like to see implemented. You can mention multiple features in one request - our AI will automatically break them down into separate tickets. Be as detailed as possible..."
             />
             <p className="mt-2 text-sm text-slate-400">
-              💡 Our AI will automatically analyze your request and fill in the title, priority level, and assignee based on your description.
+              💡 Our AI will automatically analyze your request and create separate tickets for each functionality mentioned. Each ticket will have its own title, priority level, and assigned team member.
             </p>
           </div>
 
@@ -112,7 +117,7 @@ export default function TicketSubmission() {
                 Redirecting to ticket board...
               </div>
             ) : (
-              '✅ Functionality request submitted! AI is processing your request and will assign priority, title, and team member. Redirecting to ticket board...'
+              '✅ Functionality request submitted! AI is analyzing your request and will create the appropriate number of tickets based on the functionalities mentioned. Redirecting to ticket board...'
             )}
           </div>
         )}
