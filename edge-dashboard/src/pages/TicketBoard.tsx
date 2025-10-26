@@ -54,7 +54,8 @@ export default function TicketBoard() {
     return tickets.filter(ticket => ticket.status === status)
   }
 
-  const getImportanceColor = (importance: number) => {
+  const getImportanceColor = (importance: number | null) => {
+    if (!importance) return 'bg-slate-500/20 text-slate-300 border-slate-500/40'
     switch (importance) {
       case 3: return 'bg-red-500/20 text-red-400 border-red-500/40'
       case 2: return 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40'
@@ -76,16 +77,20 @@ export default function TicketBoard() {
   const TicketCard = ({ ticket }: { ticket: Ticket }) => (
     <div className="bg-slate-700 rounded-lg p-4 border border-slate-600 hover:border-slate-500 transition-colors">
       <div className="flex items-start justify-between mb-2">
-        <h3 className="font-semibold text-slate-100 text-sm">{ticket.name}</h3>
-        <span className={`text-xs px-2 py-1 rounded ${getImportanceColor(ticket.importance)}`}>
-          P{ticket.importance}
-        </span>
+        <h3 className="font-semibold text-slate-100 text-sm">
+          {ticket.name || 'AI Processing...'}
+        </h3>
+        {ticket.importance && (
+          <span className={`text-xs px-2 py-1 rounded ${getImportanceColor(ticket.importance)}`}>
+            P{ticket.importance}
+          </span>
+        )}
       </div>
       
       <p className="text-slate-300 text-xs mb-3 line-clamp-3">{ticket.description}</p>
       
       <div className="flex items-center justify-between text-xs text-slate-400 mb-3">
-        <span>Assignee: {ticket.assignee}</span>
+        <span>Assignee: {ticket.assignee || 'AI Processing...'}</span>
         <span>{new Date(ticket.createdAt).toLocaleDateString()}</span>
       </div>
 
