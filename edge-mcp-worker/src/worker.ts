@@ -116,30 +116,289 @@ export default {
 
 			// Route: POST /tickets
 			if (request.method === 'POST' && url.pathname === '/tickets') {
-				const body = await request.json() as { name: string; description: string; importance: 1 | 2 | 3; assignee: string };
+				const body = await request.json() as { description: string };
 				
 				// Generate ticket ID (last 6 digits of timestamp)
 				const id = "TICKET-" + Date.now().toString().slice(-6);
 				const now = new Date().toISOString();
 				
-				await env.DB.prepare(
-					'INSERT INTO tickets (id, name, description, importance, status, assignee, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-				).bind(id, body.name, body.description, body.importance, 'open', body.assignee, now, now).run();
-				
-				return json({ success: true });
+				// AI Processing - Analyze description and generate multiple tickets
+				try {
+					// Use Workers AI to analyze the description and break it into separate functionalities
+					const prompt = `Analyze this functionality request and break it down into separate, specific tickets. 
+					Return a JSON array where each object represents a distinct functionality that needs to be implemented.
+					
+					Format:
+					[
+						{
+							"name": "Short descriptive title (max 50 chars)",
+							"description": "Detailed description of this specific functionality",
+							"importance": 1-3,
+							"assignee": "Team member name (choose from: John Doe, Jane Smith, Mike Johnson, Sarah Wilson, Alex Chen, Maria Rodriguez)"
+						}
+					]
+					
+					PRIORITY GUIDELINES (importance field):
+					Importance 3 (HIGH - Critical):
+					- Security vulnerabilities, authentication, authorization
+					- Payment processing, financial transactions
+					- Data loss prevention, backup systems
+					- User-visible errors or crashes
+					- Blocking other features or workflows
+					- Mentions: "urgent", "critical", "emergency", "asap", "blocking", "security", "payment", "data loss"
+					
+					Importance 2 (MEDIUM - Important):
+					- Core feature implementations
+					- API endpoints, database schema
+					- User-facing functionality (non-critical)
+					- Performance improvements
+					- Mentions: "important", "soon", "priority", "core feature", "api", "database"
+					
+					Importance 1 (LOW - Nice to have):
+					- UI polish, styling, animations
+					- Nice-to-have features
+					- Documentation updates
+					- Minor enhancements
+					- No urgency indicators, general improvements
+					
+					ASSIGNMENT GUIDELINES:
+					- Security/auth: Sarah Wilson
+					- Backend/API/database: Mike Johnson
+					- Frontend/UI: Jane Smith
+					- Mobile: Alex Chen
+					- General/data: Maria Rodriguez
+					- Default: John Doe
+					
+					TICKET CREATION:
+					- Each ticket should represent ONE specific functionality
+					- If the request mentions multiple features, create separate tickets for each
+					- If it's a single feature, create one ticket
+					- Be specific and actionable for each ticket
+					
+					Request: "${body.description}"`;
+					
+					const aiResponse = await env.AI.run('@cf/meta/llama-2-7b-chat-int8', {
+						prompt
+					});
+					
+					// Parse AI response and create tickets
+					let tickets = [];
+					
+					try {
+						// Try to parse the AI response as JSON
+						const responseText = typeof aiResponse === 'string' ? aiResponse : aiResponse.response || '';
+						const aiTickets = JSON.parse(responseText);
+						
+						if (Array.isArray(aiTickets) && aiTickets.length > 0) {
+							tickets = aiTickets;
+						} else {
+							throw new Error('Invalid AI response format');
+						}
+					} catch (parseError) {
+						console.log('AI response parsing failed, using fallback logic');
+						
+						// Fallback: Use keyword-based analysis to break down the request
+						const description = body.description.toLowerCase();
+						
+						// Smart priority detection
+						const calculateImportance = (keywords: string[], text: string): number => {
+							// High priority indicators
+							if (/urgent|critical|emergency|asap|blocking|security|vulnerability|breach|payment|transaction|data loss|crashes|errors/.test(text)) {
+								return 3;
+							}
+							// Medium priority indicators
+							if (/important|soon|priority|core|essential|must have/.test(text)) {
+								return 2;
+							}
+							// Security/auth always high
+							if (keywords.some(k => /auth|security|login|password|encrypt|ssl|cert/.test(k))) {
+								return 3;
+							}
+							// Core features medium-high
+							if (keywords.some(k => /api|backend|database|server|core|feature/.test(k))) {
+								return 2;
+							}
+							// UI/frontend usually low-medium
+							if (keywords.some(k => /ui|design|style|animation|polish|frontend/.test(k))) {
+								return 1;
+							}
+							return 2; // Default medium
+						};
+						
+						const functionalities = [];
+						
+						// Security and Authentication (HIGH priority)
+						if (/authentication|login|auth|security|password|encrypt|ssl|cert/.test(description)) {
+							functionalities.push({
+								name: "User Authentication System",
+								description: "Implement secure user authentication with login/logout functionality",
+								importance: calculateImportance(['auth'], description),
+								assignee: "Sarah Wilson"
+							});
+						}
+						
+						// Database and data (MEDIUM-HIGH priority)
+						if (/database|data|storage|persist|query|schema/.test(description)) {
+							functionalities.push({
+								name: "Database Implementation",
+								description: "Set up and configure database for data storage and retrieval",
+								importance: calculateImportance(['database'], description),
+								assignee: "Mike Johnson"
+							});
+						}
+						
+						// Backend API (MEDIUM-HIGH priority)
+						if (/api|backend|server|endpoint|service|microservice/.test(description)) {
+							functionalities.push({
+								name: "Backend API",
+								description: "Develop backend API and server-side functionality",
+								importance: calculateImportance(['api', 'backend'], description),
+								assignee: "Mike Johnson"
+							});
+						}
+						
+						// Frontend UI (LOW-MEDIUM priority)
+						if (/frontend|ui|interface|design|style|animation|polish/.test(description)) {
+							functionalities.push({
+								name: "Frontend Interface",
+								description: "Create user interface and frontend components",
+								importance: calculateImportance(['ui', 'frontend'], description),
+								assignee: "Jane Smith"
+							});
+						}
+						
+						// Mobile app (MEDIUM priority)
+						if (/mobile|app|ios|android|react native/.test(description)) {
+							functionalities.push({
+								name: "Mobile Application",
+								description: "Develop mobile application functionality",
+								importance: calculateImportance(['mobile'], description),
+								assignee: "Alex Chen"
+							});
+						}
+						
+						// If no specific functionalities detected, create a general ticket
+						if (functionalities.length === 0) {
+							const words = body.description.split(' ').slice(0, 6);
+							const name = words.join(' ').replace(/[^\w\s]/g, '');
+							
+							functionalities.push({
+								name: name || "General Functionality Request",
+								description: body.description,
+								importance: calculateImportance([], description),
+								assignee: "John Doe"
+							});
+						}
+						
+						tickets = functionalities;
+					}
+					
+					// Create tickets in database
+					const createdTickets = [];
+					
+					for (let i = 0; i < tickets.length; i++) {
+						const ticket = tickets[i];
+						const ticketId = "TICKET-" + Date.now().toString().slice(-6) + "-" + (i + 1);
+						
+						await env.DB.prepare(
+							'INSERT INTO tickets (id, name, description, importance, status, assignee, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+						).bind(
+							ticketId, 
+							ticket.name, 
+							ticket.description, 
+							ticket.importance, 
+							'open', 
+							ticket.assignee, 
+							now, 
+							now
+						).run();
+						
+						createdTickets.push({
+							id: ticketId,
+							name: ticket.name,
+							description: ticket.description,
+							importance: ticket.importance,
+							status: 'open',
+							assignee: ticket.assignee,
+							createdAt: now,
+							updatedAt: now
+						});
+					}
+					
+					return json({ 
+						success: true,
+						tickets: createdTickets,
+						count: createdTickets.length
+					});
+					
+				} catch (aiError) {
+					console.error('AI processing failed, using fallback:', aiError);
+					
+					// Ultimate fallback: create a single ticket
+					const fallbackId = "TICKET-" + Date.now().toString().slice(-6);
+					const fallbackName = "AI-Generated Request";
+					const fallbackImportance = 1;
+					const fallbackAssignee = "John Doe";
+					
+					await env.DB.prepare(
+						'INSERT INTO tickets (id, name, description, importance, status, assignee, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+					).bind(fallbackId, fallbackName, body.description, fallbackImportance, 'open', fallbackAssignee, now, now).run();
+					
+					return json({ 
+						success: true,
+						tickets: [{
+							id: fallbackId,
+							name: fallbackName,
+							description: body.description,
+							importance: fallbackImportance,
+							status: 'open',
+							assignee: fallbackAssignee,
+							createdAt: now,
+							updatedAt: now
+						}],
+						count: 1
+					});
+				}
 			}
 
-			// Route: PATCH /tickets/:id
-			if (request.method === 'PATCH' && url.pathname.startsWith('/tickets/')) {
-				const ticketId = url.pathname.split('/').pop();
-				const body = await request.json() as { status: string };
-				
-				await env.DB.prepare(
-					'UPDATE tickets SET status = ?, updatedAt = ? WHERE id = ?'
-				).bind(body.status, new Date().toISOString(), ticketId).run();
-				
-				return json({ success: true });
+		// Route: PATCH /tickets/:id
+		if (request.method === 'PATCH' && url.pathname.startsWith('/tickets/')) {
+			const ticketId = url.pathname.split('/').pop();
+			const body = await request.json() as { status?: string; importance?: number };
+			const now = new Date().toISOString();
+			
+			// Build update query dynamically based on what's being updated
+			const updates: string[] = [];
+			const values: any[] = [];
+			
+			if (body.status !== undefined) {
+				updates.push('status = ?');
+				values.push(body.status);
 			}
+			
+			if (body.importance !== undefined) {
+				// Validate importance is 1, 2, or 3
+				if (![1, 2, 3].includes(body.importance)) {
+					return json({ error: 'Invalid importance value. Must be 1, 2, or 3' }, 400, origin);
+				}
+				updates.push('importance = ?');
+				values.push(body.importance);
+			}
+			
+			if (updates.length === 0) {
+				return json({ error: 'No fields to update' }, 400, origin);
+			}
+			
+			updates.push('updatedAt = ?');
+			values.push(now);
+			values.push(ticketId);
+			
+			await env.DB.prepare(
+				`UPDATE tickets SET ${updates.join(', ')} WHERE id = ?`
+			).bind(...values).run();
+			
+			return json({ success: true }, 200, origin);
+		}
 			
 			// Route: POST /mcp/call-tool
 			if (request.method === 'POST' && url.pathname === '/mcp/call-tool') {

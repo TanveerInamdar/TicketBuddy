@@ -46,6 +46,31 @@ export default function TicketBoard() {
     }
   }
 
+  const updateTicketPriority = async (ticketId: string, newPriority: 1 | 2 | 3) => {
+    try {
+      const response = await fetch(`${API_BASE}/tickets/${ticketId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ importance: newPriority })
+      })
+
+      if (response.ok) {
+        setTickets(prev => prev.map(ticket => 
+          ticket.id === ticketId 
+            ? { ...ticket, importance: newPriority, updatedAt: new Date().toISOString() }
+            : ticket
+        ))
+        console.log(`✅ Ticket ${ticketId} priority updated to ${newPriority}`)
+      } else {
+        console.error(`❌ Failed to update ticket priority ${ticketId}:`, response.status, response.statusText)
+      }
+    } catch (error) {
+      console.error('❌ Failed to update ticket priority:', error)
+    }
+  }
+
   useEffect(() => {
     fetchTickets()
   }, [])
@@ -54,7 +79,8 @@ export default function TicketBoard() {
     return tickets.filter(ticket => ticket.status === status)
   }
 
-  const getImportanceColor = (importance: number) => {
+  const getImportanceColor = (importance: number | null) => {
+    if (!importance) return 'bg-slate-500/20 text-slate-300 border-slate-500/40'
     switch (importance) {
       case 3: return 'bg-red-500/20 text-red-400 border-red-500/40'
       case 2: return 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40'
@@ -76,16 +102,30 @@ export default function TicketBoard() {
   const TicketCard = ({ ticket }: { ticket: Ticket }) => (
     <div className="bg-slate-700 rounded-lg p-4 border border-slate-600 hover:border-slate-500 transition-colors">
       <div className="flex items-start justify-between mb-2">
-        <h3 className="font-semibold text-slate-100 text-sm">{ticket.name}</h3>
-        <span className={`text-xs px-2 py-1 rounded ${getImportanceColor(ticket.importance)}`}>
-          P{ticket.importance}
-        </span>
+        <h3 className="font-semibold text-slate-100 text-sm">
+          {ticket.name || 'AI Processing...'}
+        </h3>
+        <select
+          value={ticket.importance || 1}
+          onChange={(e) => updateTicketPriority(ticket.id, parseInt(e.target.value) as 1 | 2 | 3)}
+          className={`text-xs px-2 py-1 rounded font-semibold border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none ${getImportanceColor(ticket.importance || 1)}`}
+          style={{
+            backgroundColor: ticket.importance === 3 ? 'rgba(239, 68, 68, 0.2)' : 
+                           ticket.importance === 2 ? 'rgba(234, 179, 8, 0.2)' : 
+                           'rgba(34, 197, 94, 0.2)'
+          }}
+          title="Change priority"
+        >
+          <option value={1} style={{ backgroundColor: '#1e293b', color: '#86efac' }}>🟢 Low</option>
+          <option value={2} style={{ backgroundColor: '#1e293b', color: '#fde047' }}>🟡 Medium</option>
+          <option value={3} style={{ backgroundColor: '#1e293b', color: '#f87171' }}>🔴 High</option>
+        </select>
       </div>
       
       <p className="text-slate-300 text-xs mb-3 line-clamp-3">{ticket.description}</p>
       
       <div className="flex items-center justify-between text-xs text-slate-400 mb-3">
-        <span>Assignee: {ticket.assignee}</span>
+        <span>Assignee: {ticket.assignee || 'AI Processing...'}</span>
         <span>{new Date(ticket.createdAt).toLocaleDateString()}</span>
       </div>
 
