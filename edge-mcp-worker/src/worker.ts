@@ -153,6 +153,27 @@ async function ghPatch(env: Env, path: string, body: any) {
 }
 
 /**
+ * Make a PUT request to GitHub API
+ */
+async function ghPut(env: Env, path: string, body: any) {
+	const response = await fetch(`${GH_API}${path}`, {
+		method: 'PUT',
+		headers: {
+			...ghHeaders(env),
+			'Content-Type': 'application/json'
+		},
+		body: JSON.stringify(body)
+	});
+	
+	if (!response.ok) {
+		const error = await response.json().catch(() => ({ message: 'Unknown error' })) as { message: string };
+		throw new Error(`GitHub API error: ${response.status} - ${error.message}`);
+	}
+	
+	return response;
+}
+
+/**
  * Parse repository identifier (owner/repo) into owner and name
  */
 function parseRepoId(repoId: string): { owner: string; name: string } {
@@ -282,22 +303,22 @@ export default {
 						return json({ error: 'Either repo or url must be provided' }, 400, origin);
 					}
 					
-			// Fetch repository details from GitHub API
-			const response = await ghGet(env, `/repos/${repoId}`);
-			const repoData = await response.json() as {
-				full_name: string;
-				html_url: string;
-				default_branch: string;
-			};
-			
-			const now = new Date().toISOString();
-			
+					// Fetch repository details from GitHub API
+					const response = await ghGet(env, `/repos/${repoId}`);
+					const repoData = await response.json() as {
+						full_name: string;
+						html_url: string;
+						default_branch: string;
+					};
+					
+					const now = new Date().toISOString();
+					
 			// Delete any existing repos (we only support one)
 			await env.DB.prepare('DELETE FROM github_repos').run();
 			
 			// Insert the new repo
-			await env.DB.prepare(
-				`INSERT INTO github_repos (id, url, default_branch, connected_at) 
+					await env.DB.prepare(
+						`INSERT INTO github_repos (id, url, default_branch, connected_at) 
 				VALUES (?, ?, ?, ?)`
 			).bind(repoId, repoData.html_url, repoData.default_branch, now).run();
 					
@@ -324,17 +345,17 @@ export default {
 				return json({
 					success: true,
 					message: 'Repository unlinked successfully'
-				}, 200, origin);
-			} catch (error) {
-				return json({
-					success: false,
-					error: (error as Error).message
-				}, 500, origin);
+					}, 200, origin);
+				} catch (error) {
+					return json({
+						success: false,
+						error: (error as Error).message
+					}, 500, origin);
+				}
 			}
-		}
-		
-		// Route: GET /github/summary - Get GitHub integration summary
-		if (request.method === 'GET' && url.pathname === '/github/summary') {
+			
+			// Route: GET /github/summary - Get GitHub integration summary
+			if (request.method === 'GET' && url.pathname === '/github/summary') {
 				try {
 					const repos = await env.DB.prepare(
 						'SELECT * FROM github_repos ORDER BY connected_at DESC LIMIT 1'
@@ -351,12 +372,38 @@ export default {
 					
 					const repo = repos.results[0] as any;
 					
-					// Get counts
-					const [prsResult, issuesResult, eventsResult] = await Promise.all([
-						env.DB.prepare('SELECT COUNT(*) as count FROM github_pull_requests WHERE repo_id = ? AND state = ?').bind(repo.id, 'open').first(),
-						env.DB.prepare('SELECT COUNT(*) as count FROM github_issues WHERE repo_id = ? AND state = ?').bind(repo.id, 'open').first(),
-						env.DB.prepare('SELECT * FROM github_events WHERE repo_id = ? ORDER BY created_at DESC LIMIT 10').bind(repo.id).all()
+				// Fetch counts directly from GitHub API (not from local DB)
+				let openPRsCount = 0;
+				let openIssuesCount = 0;
+				
+				try {
+					const [prsResponse, issuesResponse] = await Promise.all([
+						ghGet(env, `/repos/${repo.id}/pulls?state=open&per_page=1`),
+						ghGet(env, `/repos/${repo.id}/issues?state=open&per_page=1`)
 					]);
+					
+					// GitHub API returns Link header with total count info
+					// We can also just count the array length if we fetch all
+					const prsData = await prsResponse.json() as any[];
+					const issuesData = await issuesResponse.json() as any[];
+					
+					// For accurate counts, fetch with per_page=100 and count
+					const [allPRs, allIssues] = await Promise.all([
+						ghGet(env, `/repos/${repo.id}/pulls?state=open&per_page=100`).then(r => r.json()),
+						ghGet(env, `/repos/${repo.id}/issues?state=open&per_page=100`).then(r => r.json())
+					]);
+					
+					openPRsCount = (allPRs as any[]).length;
+					openIssuesCount = (allIssues as any[]).filter((issue: any) => !issue.pull_request).length; // Issues API includes PRs, filter them out
+				} catch (ghError) {
+					console.error('Failed to fetch counts from GitHub:', ghError);
+					// Fallback to 0 if GitHub API fails
+				}
+				
+				// Get events from DB (still stored locally)
+				const eventsResult = await env.DB.prepare(
+					'SELECT * FROM github_events WHERE repo_id = ? ORDER BY created_at DESC LIMIT 10'
+				).bind(repo.id).all();
 					
 					return json({
 						connected: true,
@@ -367,8 +414,8 @@ export default {
 							connected_at: repo.connected_at
 						},
 						counts: {
-							openPRs: (prsResult as any)?.count || 0,
-							openIssues: (issuesResult as any)?.count || 0
+						openPRs: openPRsCount,
+						openIssues: openIssuesCount
 						},
 						recentEvents: (eventsResult.results || []).map((e: any) => ({
 							id: e.id,
@@ -382,15 +429,15 @@ export default {
 				}
 			}
 			
-		// Route: GET /github/:owner/:name/prs - List PRs
-		if (request.method === 'GET' && url.pathname.match(/^\/github\/[^\/]+\/[^\/]+\/prs$/)) {
-			try {
-				const pathParts = url.pathname.split('/');
-				const owner = pathParts[2];
-				const name = pathParts[3];
-				const repoId = `${owner}/${name}`;
-				const state = url.searchParams.get('state') || 'open';
-				
+			// Route: GET /github/:owner/:name/prs - List PRs
+			if (request.method === 'GET' && url.pathname.match(/^\/github\/[^\/]+\/[^\/]+\/prs$/)) {
+				try {
+					const pathParts = url.pathname.split('/');
+					const owner = pathParts[2];
+					const name = pathParts[3];
+					const repoId = `${owner}/${name}`;
+					const state = url.searchParams.get('state') || 'open';
+					
 				// Fetch directly from GitHub API
 				const ghPRs = await ghGet(env, `/repos/${repoId}/pulls?state=${state}&per_page=100`);
 				const prsData = await ghPRs.json() as any[];
@@ -410,10 +457,10 @@ export default {
 				}));
 				
 				return json({ prs }, 200, origin);
-			} catch (error) {
-				return json({ error: (error as Error).message }, 500, origin);
+				} catch (error) {
+					return json({ error: (error as Error).message }, 500, origin);
+				}
 			}
-		}
 			
 			// Route: GET /github/:owner/:name/pr/:number - Get single PR
 			if (request.method === 'GET' && url.pathname.match(/^\/github\/[^\/]+\/[^\/]+\/pr\/\d+$/)) {
@@ -438,46 +485,49 @@ export default {
 				}
 			}
 			
-		// Route: GET /github/:owner/:name/issues - List issues
-		if (request.method === 'GET' && url.pathname.match(/^\/github\/[^\/]+\/[^\/]+\/issues$/)) {
-			try {
-				const pathParts = url.pathname.split('/');
-				const owner = pathParts[2];
-				const name = pathParts[3];
-				const repoId = `${owner}/${name}`;
-				const state = url.searchParams.get('state') || 'open';
+			// Route: GET /github/:owner/:name/issues - List issues
+			if (request.method === 'GET' && url.pathname.match(/^\/github\/[^\/]+\/[^\/]+\/issues$/)) {
+				try {
+					const pathParts = url.pathname.split('/');
+					const owner = pathParts[2];
+					const name = pathParts[3];
+					const repoId = `${owner}/${name}`;
+					const state = url.searchParams.get('state') || 'open';
+					
+			// Fetch directly from GitHub API
+			const ghIssues = await ghGet(env, `/repos/${repoId}/issues?state=${state}&per_page=100`);
+			const issuesData = await ghIssues.json() as any[];
+			
+			// Get repo URL from the database
+			const repoResult = await env.DB.prepare('SELECT url FROM github_repos WHERE id = ?')
+				.bind(repoId).first() as any;
+			const repoUrl = repoResult?.url || `https://github.com/${repoId}`;
+			
+			// Filter out pull requests (PRs have a pull_request field)
+			const actualIssues = issuesData.filter((issue: any) => !issue.pull_request);
+			
+			// Transform to simpler format
+			const issues = actualIssues.map((issue: any) => ({
+				id: issue.number,
+				repo_id: repoId,
+				title: issue.title,
+				author: issue.user?.login || 'unknown',
+				state: issue.state,
+				html_url: issue.html_url,
+				created_at: issue.created_at,
+				updated_at: issue.updated_at
+			}));
 				
-				// Fetch directly from GitHub API
-				const ghIssues = await ghGet(env, `/repos/${repoId}/issues?state=${state}&per_page=100`);
-				const issuesData = await ghIssues.json() as any[];
-				
-				// Get repo URL from the database
-				const repoResult = await env.DB.prepare('SELECT url FROM github_repos WHERE id = ?')
-					.bind(repoId).first() as any;
-				const repoUrl = repoResult?.url || `https://github.com/${repoId}`;
-				
-				// Transform to simpler format
-				const issues = issuesData.map((issue: any) => ({
-					id: issue.number,
-					repo_id: repoId,
-					title: issue.title,
-					author: issue.user?.login || 'unknown',
-					state: issue.state,
-					html_url: issue.html_url,
-					created_at: issue.created_at,
-					updated_at: issue.updated_at
-				}));
-				
-				// Filter by labels if provided
-				const labels = url.searchParams.get('labels');
-				let filteredIssues = issues;
-				if (labels) {
-					const labelList = labels.split(',').map(l => l.trim().toLowerCase());
-					filteredIssues = issues.filter((issue: any) => {
-						const issueLabels = issuesData.find((i: any) => i.number === issue.id)?.labels || [];
-						return issueLabels.some((label: any) => labelList.includes(label.name.toLowerCase()));
-					});
-				}
+			// Filter by labels if provided
+					const labels = url.searchParams.get('labels');
+			let filteredIssues = issues;
+			if (labels) {
+				const labelList = labels.split(',').map(l => l.trim().toLowerCase());
+				filteredIssues = issues.filter((issue: any) => {
+					const issueLabels = actualIssues.find((i: any) => i.number === issue.id)?.labels || [];
+					return issueLabels.some((label: any) => labelList.includes(label.name.toLowerCase()));
+				});
+			}
 				
 				// Auto-create tickets for open issues (non-blocking)
 				if (state === 'open') {
@@ -485,10 +535,10 @@ export default {
 				}
 				
 				return json({ issues: filteredIssues }, 200, origin);
-			} catch (error) {
-				return json({ error: (error as Error).message }, 500, origin);
+				} catch (error) {
+					return json({ error: (error as Error).message }, 500, origin);
+				}
 			}
-		}
 			
 			// Route: GET /github/:owner/:name/events - List events
 			if (request.method === 'GET' && url.pathname.match(/^\/github\/[^\/]+\/[^\/]+\/events$/)) {
@@ -525,14 +575,14 @@ export default {
 				}
 			}
 			
-			// Route: POST /github/:owner/:name/pr/:number/merge - Merge a PR
-			if (request.method === 'POST' && url.pathname.match(/^\/github\/[^\/]+\/[^\/]+\/pr\/\d+\/merge$/)) {
-				try {
-					const pathParts = url.pathname.split('/');
-					const owner = pathParts[2];
-					const name = pathParts[3];
-					const prNumber = parseInt(pathParts[5]);
-					const repoId = `${owner}/${name}`;
+		// Route: POST /github/:owner/:name/pr/:number/merge - Merge a PR
+		if (request.method === 'POST' && url.pathname.match(/^\/github\/[^\/]+\/[^\/]+\/pr\/\d+\/merge$/)) {
+			const pathParts = url.pathname.split('/');
+			const prNumber = parseInt(pathParts[5]);
+			try {
+				const owner = pathParts[2];
+				const name = pathParts[3];
+				const repoId = `${owner}/${name}`;
 					
 					const body = await request.json() as {
 						method?: 'squash' | 'merge' | 'rebase';
@@ -554,31 +604,8 @@ export default {
 						mergeBody.commit_message = body.commit_message;
 					}
 					
-				const response = await ghPatch(env, `/repos/${repoId}/pulls/${prNumber}/merge`, mergeBody);
-				
-				// Handle GitHub API errors with clear messages
-				if (!response.ok) {
-					const errorData = await response.json() as { message?: string };
-					let errorMessage = errorData.message || 'Failed to merge pull request';
-					
-					// Provide clear error messages for common scenarios
-					if (response.status === 405) {
-						// Branch protection or PR not mergeable
-						if (errorMessage.includes('status check')) {
-							errorMessage = 'Branch protection: Required status checks must pass before merging';
-						} else if (errorMessage.includes('review')) {
-							errorMessage = 'Branch protection: Required reviews must be approved before merging';
-						} else if (errorMessage.includes('not mergeable')) {
-							errorMessage = 'Pull Request is not mergeable (likely due to conflicts)';
-						}
-					} else if (response.status === 409) {
-						// Head branch was modified
-						errorMessage = 'Head branch was modified. Review and try the merge again.';
-					}
-					
-					return json({ error: errorMessage }, response.status, origin);
-				}
-				
+				const response = await ghPut(env, `/repos/${repoId}/pulls/${prNumber}/merge`, mergeBody);
+			
 				const data = await response.json() as { merged: boolean; message: string };
 				
 				if (data.merged) {
@@ -589,7 +616,7 @@ export default {
 						SET state = 'closed', merged = 1, merged_at = ?
 						WHERE repo_id = ? AND id = ?`
 					).bind(now, repoId, prNumber).run();
-					
+				
 					// If a ticket is linked, update it to resolved
 					if (body.ticket_id) {
 						await env.DB.prepare(
@@ -602,6 +629,7 @@ export default {
 				
 				return json({ success: true, merged: data.merged, message: data.message }, 200, origin);
 			} catch (error) {
+				console.error(`Error merging PR #${prNumber}:`, error);
 				return json({ error: (error as Error).message }, 500, origin);
 			}
 			}
@@ -650,14 +678,14 @@ export default {
 				}
 			}
 			
-			// Route: PATCH /github/:owner/:name/issues/:number - Update an issue
-			if (request.method === 'PATCH' && url.pathname.match(/^\/github\/[^\/]+\/[^\/]+\/issues\/\d+$/)) {
-				try {
-					const pathParts = url.pathname.split('/');
-					const owner = pathParts[2];
-					const name = pathParts[3];
-					const issueNumber = parseInt(pathParts[5]);
-					const repoId = `${owner}/${name}`;
+		// Route: PATCH /github/:owner/:name/issues/:number - Update an issue
+		if (request.method === 'PATCH' && url.pathname.match(/^\/github\/[^\/]+\/[^\/]+\/issues\/\d+$/)) {
+			const pathParts = url.pathname.split('/');
+			const issueNumber = parseInt(pathParts[5]);
+			try {
+				const owner = pathParts[2];
+				const name = pathParts[3];
+				const repoId = `${owner}/${name}`;
 					
 					const body = await request.json() as {
 						title?: string;
@@ -680,6 +708,7 @@ export default {
 					
 					return json({ issue: data }, 200, origin);
 				} catch (error) {
+				console.error(`Error updating issue #${issueNumber}:`, error);
 					return json({ error: (error as Error).message }, 500, origin);
 				}
 			}
@@ -820,6 +849,104 @@ export default {
 				}
 			}
 			
+			// Route: POST /copilot - AI Assistant using Gemini 2.5 Flash
+			if (request.method === 'POST' && url.pathname === '/copilot') {
+				try {
+					const body = await request.json() as {
+						messages: Array<{ role: 'user' | 'assistant' | 'system', content: string }>;
+						context?: {
+							page?: string;
+							ticketsCount?: number;
+							githubConnected?: boolean;
+						};
+					};
+					
+					if (!body.messages || !Array.isArray(body.messages) || body.messages.length === 0) {
+						return json({ error: 'Messages array is required' }, 400, origin);
+					}
+					
+					// Build system context based on current page/state
+					let systemContext = `You are TicketBuddy Copilot, an AI assistant for a ticket management system with GitHub integration. 
+
+The system has these features:
+- Ticket submission and AI-powered parsing
+- Kanban-style ticket board (Open, In Progress, QA, Resolved)
+- GitHub integration (PRs, Issues, Auto-ticket creation)
+- Analytics dashboard with charts and performance metrics
+- Priority levels (High/Medium/Low)
+
+Be helpful, concise, and actionable. Provide step-by-step guidance when appropriate.`;
+					
+					if (body.context) {
+						if (body.context.page) {
+							systemContext += `\n\nUser is currently on: ${body.context.page} page.`;
+						}
+						if (body.context.ticketsCount !== undefined) {
+							systemContext += `\n\nTotal tickets in system: ${body.context.ticketsCount}`;
+						}
+						if (body.context.githubConnected !== undefined) {
+							systemContext += `\n\nGitHub integration: ${body.context.githubConnected ? 'Connected' : 'Not connected'}`;
+						}
+					}
+					
+					// Format messages for Gemini API
+					const geminiMessages = [
+						{ role: 'user', parts: [{ text: systemContext }] },
+						...body.messages.map(msg => ({
+							role: msg.role === 'assistant' ? 'model' : 'user',
+							parts: [{ text: msg.content }]
+						}))
+					];
+					
+					// Call Gemini API
+					const geminiResponse = await fetch(
+						`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${env.GEMINI_API_KEY}`,
+						{
+							method: 'POST',
+							headers: {
+								'Content-Type': 'application/json',
+							},
+							body: JSON.stringify({
+								contents: geminiMessages,
+								generationConfig: {
+									temperature: 0.7,
+									topK: 40,
+									topP: 0.95,
+									maxOutputTokens: 1024,
+								}
+							})
+						}
+					);
+					
+					if (!geminiResponse.ok) {
+						const errorText = await geminiResponse.text();
+						console.error('Gemini API error:', errorText);
+						return json({ error: 'Failed to get response from Gemini API' }, 500, origin);
+					}
+					
+					const geminiData = await geminiResponse.json() as any;
+					
+					// Extract response text
+					let responseText = 'Sorry, I could not generate a response.';
+					if (geminiData.candidates && geminiData.candidates.length > 0) {
+						const candidate = geminiData.candidates[0];
+						if (candidate.content && candidate.content.parts && candidate.content.parts.length > 0) {
+							responseText = candidate.content.parts[0].text || responseText;
+						}
+					}
+					
+					return json({
+						response: responseText,
+						usage: geminiData.usageMetadata || {}
+					}, 200, origin);
+				} catch (error) {
+					console.error('Copilot error:', error);
+					return json({
+						error: (error as Error).message || 'Failed to process copilot request'
+					}, 500, origin);
+				}
+			}
+			
 			// Route: GET /incidents
 			if (request.method === 'GET' && url.pathname === '/incidents') {
 				try {
@@ -948,16 +1075,16 @@ export default {
 					- If it's a single feature, create one ticket
 					- Be specific and actionable for each ticket
 					
-			Request: "${body.description}"`;
-			
-			let tickets = [];
-			
-			try {
-				const aiResponse = await env.AI.run('@cf/meta/llama-2-7b-chat-int8', {
+					Request: "${body.description}"`;
+					
+					let tickets = [];
+					
+					try {
+				const aiResponse = await env.AI.run('@cf/meta/llama-3.1-8b-instruct-fast' as any, {
 					messages: [
 						{
 							role: 'system',
-							content: `You are a ticket management assistant. Analyze requests and create tickets with appropriate priority levels.
+							content: `You are a ticket management assistant. Analyze requests and create well-formatted tickets with clear problem descriptions.
 
 IMPORTANCE LEVELS (1-3):
 - 3 = High urgency: Time-sensitive, needs immediate attention, affects many users, system failures
@@ -970,23 +1097,42 @@ PRIORITY GUIDELINES:
 - Consider LANGUAGE TONE: Casual requests ("maybe add", "when possible") = lower priority
 - Consider USER URGENCY: Words expressing urgency increase priority naturally
 
+DESCRIPTION FORMAT RULES:
+✅ DO:
+- Write in clear, professional language
+- Start with "Problem:" followed by what's wrong or needed
+- Add "Details:" section with specifics (when, where, who is affected)
+- Add "Expected Outcome:" or "Goal:" to clarify what success looks like
+- Use bullet points for clarity when listing multiple items
+- Keep descriptions concise but informative (2-4 sentences)
+
+❌ DON'T:
+- Include code snippets, function names, or technical implementation details
+- Use overly technical jargon unless necessary
+- Write long paragraphs - keep it scannable
+- Include file paths or line numbers
+
+DESCRIPTION EXAMPLE FORMAT:
+"Problem: Users cannot complete checkout process.
+
+Details: Multiple customers reported being unable to finalize purchases. The issue appears to affect payment processing specifically. Occurring since yesterday evening.
+
+Expected Outcome: Users should be able to complete purchases without errors."
+
 RESPONSE FORMAT (JSON ONLY - NO EXTRA TEXT):
 [
   {
-    "name": "Short descriptive title",
-    "description": "Detailed description of the work needed",
+    "name": "Short descriptive title (no code)",
+    "description": "Well-formatted description following the rules above",
     "importance": 1 | 2 | 3,
     "assignee": "John Doe" | "Sarah Wilson" | "Mike Johnson"
   }
 ]
 
-EXAMPLES:
-"Need this fixed within 1 hour" → importance: 3 (time constraint)
-"Site is completely down" → importance: 3 (critical system failure)
-"Can we add dark mode sometime?" → importance: 1 (casual, no urgency)
-"Implement user authentication" → importance: 2 (important but no emergency)
-
-CRITICAL: Output ONLY valid JSON. No explanations before or after.`
+CRITICAL: 
+- Output ONLY valid JSON. No explanations before or after.
+- NO code in name or description fields.
+- Follow the description format rules strictly.`
 						},
 						{
 							role: 'user',
@@ -996,7 +1142,7 @@ CRITICAL: Output ONLY valid JSON. No explanations before or after.`
 				});
 					
 				// Get the text response (it's in response.response)
-				let aiText = aiResponse.response || '';
+				let aiText = (aiResponse as any).response || '';
 				console.log('AI Response:', aiText);
 				
 				// Try to extract JSON array from response (in case AI adds extra text)
@@ -1005,15 +1151,15 @@ CRITICAL: Output ONLY valid JSON. No explanations before or after.`
 					aiText = jsonMatch[0];
 				}
 				
-				// Try to parse the AI response as JSON
+						// Try to parse the AI response as JSON
 				const aiTickets = JSON.parse(aiText);
-				
-				if (Array.isArray(aiTickets) && aiTickets.length > 0) {
-					tickets = aiTickets;
+						
+						if (Array.isArray(aiTickets) && aiTickets.length > 0) {
+							tickets = aiTickets;
 					console.log(`✅ AI parsed ${tickets.length} tickets successfully!`);
-				} else {
-					throw new Error('Invalid AI response format');
-				}
+						} else {
+							throw new Error('Invalid AI response format');
+						}
 			} catch (aiError) {
 				console.log('AI processing failed:', aiError);
 						
@@ -1155,40 +1301,40 @@ CRITICAL: Output ONLY valid JSON. No explanations before or after.`
 							createdAt: now,
 							updatedAt: now
 						});
-				}
-				
-			return json({ 
-				success: true,
-				tickets: createdTickets,
-				count: createdTickets.length
-			});
+					}
+					
+					return json({ 
+						success: true,
+						tickets: createdTickets,
+						count: createdTickets.length
+					});
 		} catch (error) {
 			console.error('AI processing failed:', error);
 			// Fallback: create single ticket
-			const fallbackId = "TICKET-" + Date.now().toString().slice(-6);
-			await env.DB.prepare(
-				'INSERT INTO tickets (id, name, description, importance, status, assignee, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+					const fallbackId = "TICKET-" + Date.now().toString().slice(-6);
+					await env.DB.prepare(
+						'INSERT INTO tickets (id, name, description, importance, status, assignee, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
 			).bind(fallbackId, "AI-Generated Request", body.description, 1, 'open', "John Doe", now, now).run();
-			
-			return json({ 
-				success: true,
-				tickets: [{
-					id: fallbackId,
+					
+					return json({ 
+						success: true,
+						tickets: [{
+							id: fallbackId,
 					name: "AI-Generated Request",
-					description: body.description,
+							description: body.description,
 					importance: 1,
-					status: 'open',
+							status: 'open',
 					assignee: "John Doe",
-					createdAt: now,
-					updatedAt: now
-				}],
-				count: 1
-			});
-		}
-	}
+							createdAt: now,
+							updatedAt: now
+						}],
+						count: 1
+					});
+				}
+			}
 
-	// Route: PATCH /tickets/:id
-	if (request.method === 'PATCH' && url.pathname.startsWith('/tickets/')) {
+		// Route: PATCH /tickets/:id
+		if (request.method === 'PATCH' && url.pathname.startsWith('/tickets/')) {
 			const ticketId = url.pathname.split('/').pop();
 			const body = await request.json() as { status?: string; importance?: number };
 			const now = new Date().toISOString();
@@ -1268,8 +1414,17 @@ CRITICAL: Output ONLY valid JSON. No explanations before or after.`
 						const logsJson = JSON.stringify(fakeLogs);
 						const prompt = `You are an SRE assistant. Analyze these logs. Output JSON with keys: summary, severity (high|medium|low), recommendedFix. Here are the logs: ${logsJson}`;
 						
-						const aiResponse = await env.AI.run('@cf/meta/llama-2-7b-chat-int8', {
-							prompt
+				const aiResponse = await env.AI.run('@cf/meta/llama-3.1-8b-instruct-fast' as any, {
+					messages: [
+						{
+							role: 'system',
+							content: 'You are an SRE assistant. Analyze logs and provide insights in JSON format with keys: summary, severity (high|medium|low), recommendedFix.'
+						},
+						{
+							role: 'user',
+							content: `Analyze these logs: ${logsJson}`
+						}
+					]
 						});
 						
 						// Parse AI response (simplified for MVP)
@@ -1445,4 +1600,7 @@ interface Env {
 	GITHUB_TOKEN: string;
 	GITHUB_WEBHOOK_SECRET: string;
 	GITHUB_DEFAULT_REPO: string;
+	
+	// Gemini API for copilot
+	GEMINI_API_KEY: string;
 }
