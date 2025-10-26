@@ -361,17 +361,44 @@ export default {
 				}
 			}
 
-			// Route: PATCH /tickets/:id
-			if (request.method === 'PATCH' && url.pathname.startsWith('/tickets/')) {
-				const ticketId = url.pathname.split('/').pop();
-				const body = await request.json() as { status: string };
-				
-				await env.DB.prepare(
-					'UPDATE tickets SET status = ?, updatedAt = ? WHERE id = ?'
-				).bind(body.status, new Date().toISOString(), ticketId).run();
-				
-				return json({ success: true });
+		// Route: PATCH /tickets/:id
+		if (request.method === 'PATCH' && url.pathname.startsWith('/tickets/')) {
+			const ticketId = url.pathname.split('/').pop();
+			const body = await request.json() as { status?: string; importance?: number };
+			const now = new Date().toISOString();
+			
+			// Build update query dynamically based on what's being updated
+			const updates: string[] = [];
+			const values: any[] = [];
+			
+			if (body.status !== undefined) {
+				updates.push('status = ?');
+				values.push(body.status);
 			}
+			
+			if (body.importance !== undefined) {
+				// Validate importance is 1, 2, or 3
+				if (![1, 2, 3].includes(body.importance)) {
+					return json({ error: 'Invalid importance value. Must be 1, 2, or 3' }, 400, origin);
+				}
+				updates.push('importance = ?');
+				values.push(body.importance);
+			}
+			
+			if (updates.length === 0) {
+				return json({ error: 'No fields to update' }, 400, origin);
+			}
+			
+			updates.push('updatedAt = ?');
+			values.push(now);
+			values.push(ticketId);
+			
+			await env.DB.prepare(
+				`UPDATE tickets SET ${updates.join(', ')} WHERE id = ?`
+			).bind(...values).run();
+			
+			return json({ success: true }, 200, origin);
+		}
 			
 			// Route: POST /mcp/call-tool
 			if (request.method === 'POST' && url.pathname === '/mcp/call-tool') {
