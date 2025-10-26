@@ -7,6 +7,8 @@ export interface Ticket {
   assignee: string | null
   createdAt: string
   updatedAt: string
+  github_pr_number: number | null
+  github_issue_number: number | null
 }
 
 export interface CreateTicketRequest {

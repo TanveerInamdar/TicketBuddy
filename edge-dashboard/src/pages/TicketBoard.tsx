@@ -4,8 +4,21 @@ import { Ticket } from '../types/ticket'
 export default function TicketBoard() {
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [expandedTickets, setExpandedTickets] = useState<Set<string>>(new Set())
 
   const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8787'
+
+  const toggleTicketExpansion = (ticketId: string) => {
+    setExpandedTickets(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(ticketId)) {
+        newSet.delete(ticketId)
+      } else {
+        newSet.add(ticketId)
+      }
+      return newSet
+    })
+  }
 
   const fetchTickets = async () => {
     try {
@@ -99,35 +112,94 @@ export default function TicketBoard() {
     }
   }
 
-  const TicketCard = ({ ticket }: { ticket: Ticket }) => (
-    <div className="bg-slate-700 rounded-lg p-4 border border-slate-600 hover:border-slate-500 transition-colors">
-      <div className="flex items-start justify-between mb-2">
-        <h3 className="font-semibold text-slate-100 text-sm">
-          {ticket.name || 'AI Processing...'}
-        </h3>
-        <select
-          value={ticket.importance || 1}
-          onChange={(e) => updateTicketPriority(ticket.id, parseInt(e.target.value) as 1 | 2 | 3)}
-          className={`text-xs px-2 py-1 rounded font-semibold border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none ${getImportanceColor(ticket.importance || 1)}`}
-          style={{
-            backgroundColor: ticket.importance === 3 ? 'rgba(239, 68, 68, 0.2)' : 
-                           ticket.importance === 2 ? 'rgba(234, 179, 8, 0.2)' : 
-                           'rgba(34, 197, 94, 0.2)'
-          }}
-          title="Change priority"
-        >
-          <option value={1} style={{ backgroundColor: '#1e293b', color: '#86efac' }}>🟢 Low</option>
-          <option value={2} style={{ backgroundColor: '#1e293b', color: '#fde047' }}>🟡 Medium</option>
-          <option value={3} style={{ backgroundColor: '#1e293b', color: '#f87171' }}>🔴 High</option>
-        </select>
-      </div>
-      
-      <p className="text-slate-300 text-xs mb-3 line-clamp-3">{ticket.description}</p>
-      
-      <div className="flex items-center justify-between text-xs text-slate-400 mb-3">
-        <span>Assignee: {ticket.assignee || 'AI Processing...'}</span>
-        <span>{new Date(ticket.createdAt).toLocaleDateString()}</span>
-      </div>
+  const TicketCard = ({ ticket }: { ticket: Ticket }) => {
+    const isExpanded = expandedTickets.has(ticket.id)
+    
+    return (
+      <div className="bg-slate-700 rounded-lg p-4 border border-slate-600 hover:border-slate-500 transition-all">
+        <div className="flex items-start justify-between mb-2">
+          <h3 className="font-semibold text-slate-100 text-sm flex items-center gap-2">
+            <span>{ticket.name || 'AI Processing...'}</span>
+            <button
+              onClick={() => toggleTicketExpansion(ticket.id)}
+              className="text-slate-400 hover:text-slate-200 transition-colors p-1"
+              title={isExpanded ? "Collapse" : "Expand for details"}
+            >
+              <svg 
+                className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          </h3>
+          <select
+            value={ticket.importance || 1}
+            onChange={(e) => updateTicketPriority(ticket.id, parseInt(e.target.value) as 1 | 2 | 3)}
+            onClick={(e) => e.stopPropagation()}
+            className={`text-xs px-2 py-1 rounded font-semibold border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none ${getImportanceColor(ticket.importance || 1)}`}
+            style={{
+              backgroundColor: ticket.importance === 3 ? 'rgba(239, 68, 68, 0.2)' : 
+                             ticket.importance === 2 ? 'rgba(234, 179, 8, 0.2)' : 
+                             'rgba(34, 197, 94, 0.2)'
+            }}
+            title="Change priority"
+          >
+            <option value={1} style={{ backgroundColor: '#1e293b', color: '#86efac' }}>🟢 Low</option>
+            <option value={2} style={{ backgroundColor: '#1e293b', color: '#fde047' }}>🟡 Medium</option>
+            <option value={3} style={{ backgroundColor: '#1e293b', color: '#f87171' }}>🔴 High</option>
+          </select>
+        </div>
+        
+        <p className={`text-slate-300 text-xs mb-3 transition-all ${isExpanded ? '' : 'line-clamp-3'}`}>
+          {ticket.description}
+        </p>
+        
+        {isExpanded && (
+          <div className="border-t border-slate-600 pt-3 mb-3 space-y-2 text-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400">Ticket ID:</span>
+              <span className="text-slate-200 font-mono">{ticket.id}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400">Assignee:</span>
+              <span className="text-slate-200">{ticket.assignee || 'AI Processing...'}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400">Created:</span>
+              <span className="text-slate-200">{new Date(ticket.createdAt).toLocaleString()}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400">Last Updated:</span>
+              <span className="text-slate-200">{new Date(ticket.updatedAt).toLocaleString()}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400">Status:</span>
+              <span className={`text-xs px-2 py-1 rounded ${getStatusColor(ticket.status)}`}>
+                {ticket.status.charAt(0).toUpperCase() + ticket.status.slice(1)}
+              </span>
+            </div>
+            {ticket.github_pr_number && (
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">GitHub PR:</span>
+                <span className="text-blue-400 font-mono">#{ticket.github_pr_number}</span>
+              </div>
+            )}
+            {ticket.github_issue_number && (
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">GitHub Issue:</span>
+                <span className="text-purple-400 font-mono">#{ticket.github_issue_number}</span>
+              </div>
+            )}
+          </div>
+        )}
+        
+        <div className="flex items-center justify-between text-xs text-slate-400 mb-3">
+          <span>Assignee: {ticket.assignee || 'AI Processing...'}</span>
+          <span>{new Date(ticket.createdAt).toLocaleDateString()}</span>
+        </div>
 
       <div className="flex gap-2">
         {/* Move Back Button */}
@@ -184,8 +256,9 @@ export default function TicketBoard() {
           </button>
         )}
       </div>
-    </div>
-  )
+      </div>
+    )
+  }
 
   const Column = ({ title, status, tickets }: { title: string, status: Ticket['status'], tickets: Ticket[] }) => (
     <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">

@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom'
 import TicketSubmission from './pages/TicketSubmission'
 import TicketBoard from './pages/TicketBoard'
+import GitHubIntegration from './pages/GitHubIntegration'
 
 function App() {
   return (
@@ -24,6 +25,12 @@ function App() {
                 >
                   Ticket Board
                 </Link>
+                <Link 
+                  to="/github" 
+                  className="text-slate-300 hover:text-white transition-colors"
+                >
+                  GitHub
+                </Link>
               </nav>
             </div>
           </div>
@@ -34,6 +41,7 @@ function App() {
           <Routes>
             <Route path="/" element={<TicketSubmission />} />
             <Route path="/board" element={<TicketBoard />} />
+            <Route path="/github" element={<GitHubIntegration />} />
           </Routes>
         </main>
       </div>
