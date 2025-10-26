@@ -1,0 +1,4 @@
+﻿.dev.vars
+.env
+.env.*
+edge-mcp-worker/.dev.vars
