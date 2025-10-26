@@ -6,7 +6,7 @@ usage_model = "bundled"
 [[d1_databases]]
 binding = "DB"
 database_name = "INCIDENTS_DB"
-database_id = "INCIDENTS_DB"
+database_id = "748d0201-81b5-4f67-a29a-07b79e91b403"
 
 [[kv_namespaces]]
 binding = "LOGS_KV"
