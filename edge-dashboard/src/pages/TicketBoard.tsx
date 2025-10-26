@@ -37,9 +37,12 @@ export default function TicketBoard() {
             ? { ...ticket, status: newStatus, updatedAt: new Date().toISOString() }
             : ticket
         ))
+        console.log(`✅ Ticket ${ticketId} moved to ${newStatus}`)
+      } else {
+        console.error(`❌ Failed to update ticket ${ticketId}:`, response.status, response.statusText)
       }
     } catch (error) {
-      console.error('Failed to update ticket:', error)
+      console.error('❌ Failed to update ticket:', error)
     }
   }
 
@@ -87,6 +90,27 @@ export default function TicketBoard() {
       </div>
 
       <div className="flex gap-2">
+        {/* Move Back Button */}
+        {ticket.status !== 'open' && (
+          <button
+            onClick={() => {
+              const prevStatus: Ticket['status'] = 
+                ticket.status === 'in-progress' ? 'open' :
+                ticket.status === 'qa' ? 'in-progress' :
+                ticket.status === 'resolved' ? 'qa' : 'open'
+              updateTicketStatus(ticket.id, prevStatus)
+            }}
+            className="flex-1 px-3 py-1 bg-orange-600 hover:bg-orange-700 text-white text-xs rounded transition-colors flex items-center justify-center gap-1"
+            title={`Move back to ${ticket.status === 'in-progress' ? 'Open' : ticket.status === 'qa' ? 'In Progress' : 'QA'}`}
+          >
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Back
+          </button>
+        )}
+        
+        {/* Move Next Button */}
         {ticket.status !== 'resolved' && (
           <button
             onClick={() => {
@@ -96,17 +120,26 @@ export default function TicketBoard() {
                 ticket.status === 'qa' ? 'resolved' : 'resolved'
               updateTicketStatus(ticket.id, nextStatus)
             }}
-            className="flex-1 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors"
+            className="flex-1 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors flex items-center justify-center gap-1"
+            title={`Move forward to ${ticket.status === 'open' ? 'In Progress' : ticket.status === 'in-progress' ? 'QA' : 'Resolved'}`}
           >
-            Move Next
+            Next
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
           </button>
         )}
         
+        {/* Reopen Button (only for resolved tickets) */}
         {ticket.status === 'resolved' && (
           <button
             onClick={() => updateTicketStatus(ticket.id, 'open')}
-            className="flex-1 px-3 py-1 bg-slate-600 hover:bg-slate-700 text-white text-xs rounded transition-colors"
+            className="flex-1 px-3 py-1 bg-slate-600 hover:bg-slate-700 text-white text-xs rounded transition-colors flex items-center justify-center gap-1"
+            title="Reopen ticket and move back to Open"
           >
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
             Reopen
           </button>
         )}
