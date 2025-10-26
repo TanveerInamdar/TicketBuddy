@@ -1,7 +1,9 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { CreateTicketRequest } from '../types/ticket'
 
 export default function TicketSubmission() {
+  const navigate = useNavigate()
   const [formData, setFormData] = useState<CreateTicketRequest>({
     name: '',
     description: '',
@@ -10,6 +12,7 @@ export default function TicketSubmission() {
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle')
+  const [isRedirecting, setIsRedirecting] = useState(false)
 
   const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8787'
 
@@ -30,6 +33,11 @@ export default function TicketSubmission() {
       if (response.ok) {
         setSubmitStatus('success')
         setFormData({ name: '', description: '', importance: 1, assignee: '' })
+        // Redirect to ticket board after successful submission
+        setTimeout(() => {
+          setIsRedirecting(true)
+          navigate('/board')
+        }, 1500) // Wait 1.5 seconds to show success message
       } else {
         setSubmitStatus('error')
       }
@@ -147,7 +155,17 @@ export default function TicketSubmission() {
         {/* Status Messages */}
         {submitStatus === 'success' && (
           <div className="mt-4 p-4 bg-green-500/20 border border-green-500/40 rounded-lg text-green-300">
-            ✅ Functionality request submitted successfully!
+            {isRedirecting ? (
+              <div className="flex items-center gap-2">
+                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Redirecting to ticket board...
+              </div>
+            ) : (
+              '✅ Functionality request submitted successfully! Redirecting to ticket board...'
+            )}
           </div>
         )}
         
