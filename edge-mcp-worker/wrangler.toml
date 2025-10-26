@@ -1,0 +1,21 @@
+name = "edge-mcp-worker"
+main = "src/worker.ts"
+compatibility_date = "2025-10-25"
+usage_model = "bundled"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "INCIDENTS_DB"
+database_id = "INCIDENTS_DB"
+
+[[kv_namespaces]]
+binding = "LOGS_KV"
+id = "LOGS_KV"
+
+[[r2_buckets]]
+binding = "SNAPSHOTS"
+bucket_name = "snapshots"
+
+[ai]
+binding = "AI"
+
