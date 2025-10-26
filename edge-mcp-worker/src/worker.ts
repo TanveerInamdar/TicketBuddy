@@ -133,17 +133,47 @@ export default {
 						{
 							"name": "Short descriptive title (max 50 chars)",
 							"description": "Detailed description of this specific functionality",
-							"importance": 1-3 (1=low, 2=medium, 3=high),
+							"importance": 1-3,
 							"assignee": "Team member name (choose from: John Doe, Jane Smith, Mike Johnson, Sarah Wilson, Alex Chen, Maria Rodriguez)"
 						}
 					]
 					
-					Guidelines:
+					PRIORITY GUIDELINES (importance field):
+					Importance 3 (HIGH - Critical):
+					- Security vulnerabilities, authentication, authorization
+					- Payment processing, financial transactions
+					- Data loss prevention, backup systems
+					- User-visible errors or crashes
+					- Blocking other features or workflows
+					- Mentions: "urgent", "critical", "emergency", "asap", "blocking", "security", "payment", "data loss"
+					
+					Importance 2 (MEDIUM - Important):
+					- Core feature implementations
+					- API endpoints, database schema
+					- User-facing functionality (non-critical)
+					- Performance improvements
+					- Mentions: "important", "soon", "priority", "core feature", "api", "database"
+					
+					Importance 1 (LOW - Nice to have):
+					- UI polish, styling, animations
+					- Nice-to-have features
+					- Documentation updates
+					- Minor enhancements
+					- No urgency indicators, general improvements
+					
+					ASSIGNMENT GUIDELINES:
+					- Security/auth: Sarah Wilson
+					- Backend/API/database: Mike Johnson
+					- Frontend/UI: Jane Smith
+					- Mobile: Alex Chen
+					- General/data: Maria Rodriguez
+					- Default: John Doe
+					
+					TICKET CREATION:
 					- Each ticket should represent ONE specific functionality
 					- If the request mentions multiple features, create separate tickets for each
 					- If it's a single feature, create one ticket
 					- Be specific and actionable for each ticket
-					- Consider the technical complexity and assign accordingly
 					
 					Request: "${body.description}"`;
 					
@@ -170,51 +200,79 @@ export default {
 						// Fallback: Use keyword-based analysis to break down the request
 						const description = body.description.toLowerCase();
 						
-						// Simple keyword-based breakdown
+						// Smart priority detection
+						const calculateImportance = (keywords: string[], text: string): number => {
+							// High priority indicators
+							if (/urgent|critical|emergency|asap|blocking|security|vulnerability|breach|payment|transaction|data loss|crashes|errors/.test(text)) {
+								return 3;
+							}
+							// Medium priority indicators
+							if (/important|soon|priority|core|essential|must have/.test(text)) {
+								return 2;
+							}
+							// Security/auth always high
+							if (keywords.some(k => /auth|security|login|password|encrypt|ssl|cert/.test(k))) {
+								return 3;
+							}
+							// Core features medium-high
+							if (keywords.some(k => /api|backend|database|server|core|feature/.test(k))) {
+								return 2;
+							}
+							// UI/frontend usually low-medium
+							if (keywords.some(k => /ui|design|style|animation|polish|frontend/.test(k))) {
+								return 1;
+							}
+							return 2; // Default medium
+						};
+						
 						const functionalities = [];
 						
-						// Check for common functionality patterns
-						if (description.includes('authentication') || description.includes('login') || description.includes('auth')) {
+						// Security and Authentication (HIGH priority)
+						if (/authentication|login|auth|security|password|encrypt|ssl|cert/.test(description)) {
 							functionalities.push({
 								name: "User Authentication System",
 								description: "Implement secure user authentication with login/logout functionality",
-								importance: description.includes('urgent') || description.includes('critical') ? 3 : 2,
+								importance: calculateImportance(['auth'], description),
 								assignee: "Sarah Wilson"
 							});
 						}
 						
-						if (description.includes('database') || description.includes('data') || description.includes('storage')) {
+						// Database and data (MEDIUM-HIGH priority)
+						if (/database|data|storage|persist|query|schema/.test(description)) {
 							functionalities.push({
 								name: "Database Implementation",
 								description: "Set up and configure database for data storage and retrieval",
-								importance: description.includes('urgent') || description.includes('critical') ? 3 : 2,
+								importance: calculateImportance(['database'], description),
 								assignee: "Mike Johnson"
 							});
 						}
 						
-						if (description.includes('frontend') || description.includes('ui') || description.includes('interface') || description.includes('design')) {
+						// Backend API (MEDIUM-HIGH priority)
+						if (/api|backend|server|endpoint|service|microservice/.test(description)) {
+							functionalities.push({
+								name: "Backend API",
+								description: "Develop backend API and server-side functionality",
+								importance: calculateImportance(['api', 'backend'], description),
+								assignee: "Mike Johnson"
+							});
+						}
+						
+						// Frontend UI (LOW-MEDIUM priority)
+						if (/frontend|ui|interface|design|style|animation|polish/.test(description)) {
 							functionalities.push({
 								name: "Frontend Interface",
 								description: "Create user interface and frontend components",
-								importance: description.includes('urgent') || description.includes('critical') ? 3 : 1,
+								importance: calculateImportance(['ui', 'frontend'], description),
 								assignee: "Jane Smith"
 							});
 						}
 						
-						if (description.includes('api') || description.includes('backend') || description.includes('server')) {
-							functionalities.push({
-								name: "Backend API",
-								description: "Develop backend API and server-side functionality",
-								importance: description.includes('urgent') || description.includes('critical') ? 3 : 2,
-								assignee: "Mike Johnson"
-							});
-						}
-						
-						if (description.includes('mobile') || description.includes('app')) {
+						// Mobile app (MEDIUM priority)
+						if (/mobile|app|ios|android|react native/.test(description)) {
 							functionalities.push({
 								name: "Mobile Application",
 								description: "Develop mobile application functionality",
-								importance: description.includes('urgent') || description.includes('critical') ? 3 : 2,
+								importance: calculateImportance(['mobile'], description),
 								assignee: "Alex Chen"
 							});
 						}
@@ -227,8 +285,7 @@ export default {
 							functionalities.push({
 								name: name || "General Functionality Request",
 								description: body.description,
-								importance: description.includes('urgent') || description.includes('critical') || description.includes('asap') || description.includes('emergency') ? 3 : 
-										   description.includes('important') || description.includes('soon') || description.includes('priority') ? 2 : 1,
+								importance: calculateImportance([], description),
 								assignee: "John Doe"
 							});
 						}
