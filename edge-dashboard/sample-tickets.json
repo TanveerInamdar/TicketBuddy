@@ -1,0 +1,64 @@
+{
+  "tickets": [
+    {
+      "id": "ticket-001",
+      "name": "User Authentication System",
+      "description": "Implement secure user login/logout functionality with JWT tokens, password hashing, and session management for the application",
+      "importance": 3,
+      "status": "open",
+      "assignee": "John Doe",
+      "createdAt": "2024-01-15T10:30:00Z",
+      "updatedAt": "2024-01-15T10:30:00Z"
+    },
+    {
+      "id": "ticket-002", 
+      "name": "Responsive Design Implementation",
+      "description": "Create mobile-first responsive design that works seamlessly across all device sizes and screen resolutions",
+      "importance": 2,
+      "status": "in-progress",
+      "assignee": "Jane Smith",
+      "createdAt": "2024-01-14T14:20:00Z",
+      "updatedAt": "2024-01-15T09:15:00Z"
+    },
+    {
+      "id": "ticket-003",
+      "name": "Dark Mode Theme Support",
+      "description": "Add comprehensive dark mode functionality with theme switching, user preferences, and system theme detection",
+      "importance": 1,
+      "status": "qa",
+      "assignee": "Mike Johnson",
+      "createdAt": "2024-01-13T16:45:00Z",
+      "updatedAt": "2024-01-15T11:30:00Z"
+    },
+    {
+      "id": "ticket-004",
+      "name": "Database Performance Optimization",
+      "description": "Optimize database queries and implement caching strategies to improve application performance and reduce load times",
+      "importance": 2,
+      "status": "resolved",
+      "assignee": "Sarah Wilson",
+      "createdAt": "2024-01-12T09:00:00Z",
+      "updatedAt": "2024-01-14T17:20:00Z"
+    },
+    {
+      "id": "ticket-005",
+      "name": "Real-time Notifications",
+      "description": "Implement WebSocket-based real-time notification system for ticket updates and status changes",
+      "importance": 3,
+      "status": "open",
+      "assignee": "Alex Chen",
+      "createdAt": "2024-01-16T08:15:00Z",
+      "updatedAt": "2024-01-16T08:15:00Z"
+    },
+    {
+      "id": "ticket-006",
+      "name": "Advanced Search and Filtering",
+      "description": "Add comprehensive search functionality with filters for ticket status, assignee, priority, and date ranges",
+      "importance": 2,
+      "status": "in-progress",
+      "assignee": "Maria Rodriguez",
+      "createdAt": "2024-01-15T13:45:00Z",
+      "updatedAt": "2024-01-16T10:20:00Z"
+    }
+  ]
+}
