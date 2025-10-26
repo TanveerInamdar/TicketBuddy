@@ -1336,7 +1336,7 @@ CRITICAL:
 		// Route: PATCH /tickets/:id
 		if (request.method === 'PATCH' && url.pathname.startsWith('/tickets/')) {
 			const ticketId = url.pathname.split('/').pop();
-			const body = await request.json() as { status?: string; importance?: number };
+			const body = await request.json() as { status?: string; importance?: number; assignee?: string };
 			const now = new Date().toISOString();
 			
 			// Build update query dynamically based on what's being updated
@@ -1355,6 +1355,11 @@ CRITICAL:
 				}
 				updates.push('importance = ?');
 				values.push(body.importance);
+			}
+			
+			if (body.assignee !== undefined) {
+				updates.push('assignee = ?');
+				values.push(body.assignee);
 			}
 			
 			if (updates.length === 0) {
