@@ -61,8 +61,14 @@ export default function TicketSubmission() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <div className="bg-slate-800 rounded-lg p-8 border border-slate-700">
-        <h2 className="text-2xl font-bold mb-6 text-slate-100">Submit Functionality Request</h2>
+      <div className="bg-slate-800/90 backdrop-blur-sm rounded-lg p-8 border-2 border-amber-500/30 shadow-xl shadow-purple-900/30 relative overflow-hidden">
+        {/* Space Cowboy Decorative Elements */}
+        <div className="absolute top-0 right-0 text-6xl opacity-10 pointer-events-none">🤠</div>
+        <div className="absolute bottom-0 left-0 text-4xl opacity-5 pointer-events-none">🚀</div>
+        
+        <h2 className="text-3xl font-bold mb-6 text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-purple-400 to-cyan-400 font-space tracking-wide relative">
+          🎯 Submit Mission Request
+        </h2>
         
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Description */}
@@ -89,7 +95,7 @@ export default function TicketSubmission() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 text-white font-semibold rounded-lg transition-colors duration-200 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-full px-6 py-3 bg-gradient-to-r from-amber-600 via-purple-600 to-cyan-600 hover:from-amber-500 hover:to-cyan-500 disabled:from-slate-600 disabled:to-slate-600 text-white font-bold rounded-lg transition-all duration-200 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-space shadow-lg hover:shadow-xl hover:shadow-purple-500/50 border-2 border-amber-400/30"
           >
             {isSubmitting ? (
               <>

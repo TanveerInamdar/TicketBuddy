@@ -1,46 +1,53 @@
-# Edge Dashboard
+# TicketBuddy - Space Cowboy Edition
 
-React + Vite + TypeScript dashboard for AI-powered incident management.
+A cosmic ticket management system with Auth0 authentication.
 
-## Development
+## 🚀 Setup Instructions
 
+### 1. Install Dependencies
 ```bash
-# Install dependencies
 npm install
-
-# Start dev server
-npm run dev
-
-# Build for production
-npm run build
-
-# Preview production build
-npm run preview
 ```
 
-## Deployment
+### 2. Auth0 Configuration
+1. Copy `src/auth0-config.template.ts` to `src/auth0-config.ts`:
+   ```bash
+   cp src/auth0-config.template.ts src/auth0-config.ts
+   ```
 
-This dashboard is designed to be deployed to Cloudflare Pages.
+2. Fill in your Auth0 credentials in `src/auth0-config.ts`:
+   ```typescript
+   export const auth0Config = {
+     domain: "your-auth0-domain.auth0.com",
+     clientId: "your-client-id-here",
+     audience: "https://your-auth0-domain.auth0.com/api/v2/",
+   };
+   ```
 
+### 3. Run Development Server
 ```bash
-# Build the project
-npm run build
-
-# Deploy with Wrangler
-wrangler pages deploy dist
+npm run dev
 ```
 
-## Environment Variables
+## 🔒 Security Notes
 
-Create a `.env` file:
+- **Never commit `src/auth0-config.ts` to Git**
+- The `src/auth0-config.template.ts` file shows the required configuration
+- All sensitive credentials are stored in the config file
 
-```
-VITE_API_URL=https://your-worker.your-subdomain.workers.dev
-```
+## 🌟 Features
 
-## Features
+- Space cowboy themed authentication UI
+- Animated star field background
+- Floating cowboy character
+- Glassmorphism design
+- Auth0 integration
+- Responsive design
 
-- **Incident List**: Displays all incidents from D1
-- **Run Diagnostic**: Triggers the MCP server to analyze logs and create incidents
-- **AI Assistant Panel**: Shows AI-generated analysis and recommendations
+## 🛠️ Tech Stack
 
+- React + TypeScript
+- Vite
+- Tailwind CSS
+- Auth0 React SDK
+- React Router DOM

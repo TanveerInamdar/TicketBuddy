@@ -19,3 +19,8 @@ bucket_name = "snapshots"
 [ai]
 binding = "AI"
 
+# Secrets are loaded from .dev.vars for local development
+# For production, use: wrangler secret put GITHUB_TOKEN
+# [vars]
+# Non-secret environment variables can go here
+

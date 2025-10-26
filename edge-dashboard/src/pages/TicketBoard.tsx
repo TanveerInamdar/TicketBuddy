@@ -4,8 +4,21 @@ import { Ticket } from '../types/ticket'
 export default function TicketBoard() {
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [expandedTickets, setExpandedTickets] = useState<Set<string>>(new Set())
 
   const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8787'
+
+  const toggleTicketExpansion = (ticketId: string) => {
+    setExpandedTickets(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(ticketId)) {
+        newSet.delete(ticketId)
+      } else {
+        newSet.add(ticketId)
+      }
+      return newSet
+    })
+  }
 
   const fetchTickets = async () => {
     try {
@@ -99,35 +112,107 @@ export default function TicketBoard() {
     }
   }
 
-  const TicketCard = ({ ticket }: { ticket: Ticket }) => (
-    <div className="bg-slate-700 rounded-lg p-4 border border-slate-600 hover:border-slate-500 transition-colors">
-      <div className="flex items-start justify-between mb-2">
-        <h3 className="font-semibold text-slate-100 text-sm">
-          {ticket.name || 'AI Processing...'}
-        </h3>
-        <select
-          value={ticket.importance || 1}
-          onChange={(e) => updateTicketPriority(ticket.id, parseInt(e.target.value) as 1 | 2 | 3)}
-          className={`text-xs px-2 py-1 rounded font-semibold border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none ${getImportanceColor(ticket.importance || 1)}`}
-          style={{
-            backgroundColor: ticket.importance === 3 ? 'rgba(239, 68, 68, 0.2)' : 
-                           ticket.importance === 2 ? 'rgba(234, 179, 8, 0.2)' : 
-                           'rgba(34, 197, 94, 0.2)'
-          }}
-          title="Change priority"
-        >
-          <option value={1} style={{ backgroundColor: '#1e293b', color: '#86efac' }}>🟢 Low</option>
-          <option value={2} style={{ backgroundColor: '#1e293b', color: '#fde047' }}>🟡 Medium</option>
-          <option value={3} style={{ backgroundColor: '#1e293b', color: '#f87171' }}>🔴 High</option>
-        </select>
-      </div>
-      
-      <p className="text-slate-300 text-xs mb-3 line-clamp-3">{ticket.description}</p>
-      
-      <div className="flex items-center justify-between text-xs text-slate-400 mb-3">
-        <span>Assignee: {ticket.assignee || 'AI Processing...'}</span>
-        <span>{new Date(ticket.createdAt).toLocaleDateString()}</span>
-      </div>
+  const TicketCard = ({ ticket }: { ticket: Ticket }) => {
+    const isExpanded = expandedTickets.has(ticket.id)
+    
+    return (
+      <div className="bg-slate-700 rounded-lg p-4 border border-slate-600 hover:border-slate-500 transition-all">
+        <div className="flex items-start justify-between mb-2">
+          <h3 className="font-semibold text-slate-100 text-sm flex items-center gap-2">
+            <span>{ticket.name || 'AI Processing...'}</span>
+            <button
+              onClick={() => toggleTicketExpansion(ticket.id)}
+              className="text-slate-400 hover:text-slate-200 transition-colors p-1"
+              title={isExpanded ? "Collapse" : "Expand for details"}
+            >
+              <svg 
+                className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          </h3>
+          <select
+            value={ticket.importance || 1}
+            onChange={(e) => updateTicketPriority(ticket.id, parseInt(e.target.value) as 1 | 2 | 3)}
+            onClick={(e) => e.stopPropagation()}
+            className={`text-xs px-2 py-1 rounded font-semibold border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none ${getImportanceColor(ticket.importance || 1)}`}
+            style={{
+              backgroundColor: ticket.importance === 3 ? 'rgba(239, 68, 68, 0.2)' : 
+                             ticket.importance === 2 ? 'rgba(234, 179, 8, 0.2)' : 
+                             'rgba(34, 197, 94, 0.2)'
+            }}
+            title="Change priority"
+          >
+            <option value={1} style={{ backgroundColor: '#1e293b', color: '#86efac' }}>🟢 Low</option>
+            <option value={2} style={{ backgroundColor: '#1e293b', color: '#fde047' }}>🟡 Medium</option>
+            <option value={3} style={{ backgroundColor: '#1e293b', color: '#f87171' }}>🔴 High</option>
+          </select>
+        </div>
+        
+        <p className={`text-slate-300 text-xs mb-3 transition-all ${isExpanded ? '' : 'line-clamp-3'}`}>
+          {ticket.description}
+        </p>
+        
+        {isExpanded && (
+          <div className="border-t border-slate-600 pt-3 mb-3 space-y-2 text-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400">Ticket ID:</span>
+              <span className="text-slate-200 font-mono">{ticket.id}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400">Assignee:</span>
+              <span className="text-slate-200">{ticket.assignee || 'AI Processing...'}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400">Created:</span>
+              <span className="text-slate-200">{new Date(ticket.createdAt).toLocaleString()}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400">Last Updated:</span>
+              <span className="text-slate-200">{new Date(ticket.updatedAt).toLocaleString()}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400">Status:</span>
+              <span className={`text-xs px-2 py-1 rounded ${getStatusColor(ticket.status)}`}>
+                {ticket.status.charAt(0).toUpperCase() + ticket.status.slice(1)}
+              </span>
+            </div>
+            {ticket.github_pr_number && (
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">GitHub PR:</span>
+                <span className="text-blue-400 font-mono">#{ticket.github_pr_number}</span>
+              </div>
+            )}
+            {ticket.github_issue_number && (
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">GitHub Issue:</span>
+                <span className="text-purple-400 font-mono">#{ticket.github_issue_number}</span>
+              </div>
+            )}
+            {ticket.github_repo_url && (
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Repository:</span>
+                <a 
+                  href={ticket.github_repo_url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-cyan-400 hover:text-cyan-300 text-xs underline"
+                >
+                  {ticket.github_repo_url.replace('https://github.com/', '')}
+                </a>
+              </div>
+            )}
+          </div>
+        )}
+        
+        <div className="flex items-center justify-between text-xs text-slate-400 mb-3">
+          <span>Assignee: {ticket.assignee || 'AI Processing...'}</span>
+          <span>{new Date(ticket.createdAt).toLocaleDateString()}</span>
+        </div>
 
       <div className="flex gap-2">
         {/* Move Back Button */}
@@ -184,8 +269,9 @@ export default function TicketBoard() {
           </button>
         )}
       </div>
-    </div>
-  )
+      </div>
+    )
+  }
 
   const Column = ({ title, status, tickets }: { title: string, status: Ticket['status'], tickets: Ticket[] }) => (
     <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
@@ -210,6 +296,126 @@ export default function TicketBoard() {
     </div>
   )
 
+  // Analytics calculations
+  const getAnalytics = () => {
+    const totalTickets = tickets.length
+    const resolvedTickets = tickets.filter(t => t.status === 'resolved').length
+    const completionRate = totalTickets > 0 ? ((resolvedTickets / totalTickets) * 100).toFixed(1) : '0'
+    
+    // Tickets by assignee
+    const ticketsByAssignee = tickets.reduce((acc, ticket) => {
+      const assignee = ticket.assignee || 'Unassigned'
+      if (!acc[assignee]) {
+        acc[assignee] = { total: 0, resolved: 0, open: 0, inProgress: 0, qa: 0 }
+      }
+      acc[assignee].total++
+      if (ticket.status === 'resolved') acc[assignee].resolved++
+      if (ticket.status === 'open') acc[assignee].open++
+      if (ticket.status === 'in-progress') acc[assignee].inProgress++
+      if (ticket.status === 'qa') acc[assignee].qa++
+      return acc
+    }, {} as Record<string, { total: number, resolved: number, open: number, inProgress: number, qa: number }>)
+    
+    // Tickets by priority
+    const ticketsByPriority = {
+      high: tickets.filter(t => t.importance === 3).length,
+      medium: tickets.filter(t => t.importance === 2).length,
+      low: tickets.filter(t => t.importance === 1).length,
+      unknown: tickets.filter(t => !t.importance).length
+    }
+    
+    // Tickets by status
+    const ticketsByStatus = {
+      open: getTicketsByStatus('open').length,
+      inProgress: getTicketsByStatus('in-progress').length,
+      qa: getTicketsByStatus('qa').length,
+      resolved: getTicketsByStatus('resolved').length
+    }
+    
+    return {
+      totalTickets,
+      resolvedTickets,
+      completionRate,
+      ticketsByAssignee,
+      ticketsByPriority,
+      ticketsByStatus
+    }
+  }
+
+  const PieChart = ({ data }: { 
+    data: { label: string, value: number, color: string }[]
+  }) => {
+    const total = data.reduce((sum, item) => sum + item.value, 0)
+    if (total === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center h-48">
+          <div className="w-32 h-32 rounded-full bg-slate-700/50 border-2 border-slate-600 flex items-center justify-center">
+            <span className="text-slate-400 text-sm">No data</span>
+          </div>
+        </div>
+      )
+    }
+
+    let currentAngle = 0
+    const segments = data.map(item => {
+      const percentage = (item.value / total) * 100
+      const angle = (item.value / total) * 360
+      const segment = {
+        ...item,
+        percentage: percentage.toFixed(1),
+        startAngle: currentAngle,
+        endAngle: currentAngle + angle
+      }
+      currentAngle += angle
+      return segment
+    })
+
+    const createPieSlice = (startAngle: number, endAngle: number) => {
+      const start = startAngle - 90
+      const end = endAngle - 90
+      
+      const x1 = 50 + 45 * Math.cos((Math.PI * start) / 180)
+      const y1 = 50 + 45 * Math.sin((Math.PI * start) / 180)
+      const x2 = 50 + 45 * Math.cos((Math.PI * end) / 180)
+      const y2 = 50 + 45 * Math.sin((Math.PI * end) / 180)
+      
+      const largeArc = endAngle - startAngle > 180 ? 1 : 0
+      
+      return `M 50 50 L ${x1} ${y1} A 45 45 0 ${largeArc} 1 ${x2} ${y2} Z`
+    }
+
+    return (
+      <div className="flex flex-col items-center">
+        <svg viewBox="0 0 100 100" className="w-48 h-48">
+          {segments.map((segment, idx) => (
+            <g key={idx}>
+              <path
+                d={createPieSlice(segment.startAngle, segment.endAngle)}
+                fill={segment.color}
+                stroke="#1e293b"
+                strokeWidth="0.5"
+                className="hover:opacity-80 transition-opacity cursor-pointer"
+              >
+                <title>{segment.label}: {segment.value} ({segment.percentage}%)</title>
+              </path>
+            </g>
+          ))}
+        </svg>
+        <div className="mt-4 space-y-2 w-full">
+          {segments.map((segment, idx) => (
+            <div key={idx} className="flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: segment.color }}></div>
+                <span className="text-slate-300">{segment.label}</span>
+              </div>
+              <span className="text-slate-400 font-mono">{segment.value} ({segment.percentage}%)</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -217,6 +423,8 @@ export default function TicketBoard() {
       </div>
     )
   }
+
+  const analytics = getAnalytics()
 
   return (
     <div className="space-y-6">
@@ -235,6 +443,131 @@ export default function TicketBoard() {
         <Column title="In Progress" status="in-progress" tickets={getTicketsByStatus('in-progress')} />
         <Column title="QA" status="qa" tickets={getTicketsByStatus('qa')} />
         <Column title="Resolved" status="resolved" tickets={getTicketsByStatus('resolved')} />
+      </div>
+
+      {/* Analytics Dashboard */}
+      <div className="mt-12">
+        <h2 className="text-2xl font-bold text-slate-100 mb-6">📊 Analytics Dashboard</h2>
+        
+        {/* Summary Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <div className="bg-gradient-to-br from-blue-500/20 to-blue-600/10 border border-blue-500/40 rounded-lg p-6">
+            <div className="text-blue-400 text-sm font-semibold mb-1">Total Tickets</div>
+            <div className="text-3xl font-bold text-slate-100">{analytics.totalTickets}</div>
+          </div>
+          
+          <div className="bg-gradient-to-br from-green-500/20 to-green-600/10 border border-green-500/40 rounded-lg p-6">
+            <div className="text-green-400 text-sm font-semibold mb-1">Resolved</div>
+            <div className="text-3xl font-bold text-slate-100">{analytics.resolvedTickets}</div>
+          </div>
+          
+          <div className="bg-gradient-to-br from-purple-500/20 to-purple-600/10 border border-purple-500/40 rounded-lg p-6">
+            <div className="text-purple-400 text-sm font-semibold mb-1">Completion Rate</div>
+            <div className="text-3xl font-bold text-slate-100">{analytics.completionRate}%</div>
+          </div>
+          
+          <div className="bg-gradient-to-br from-orange-500/20 to-orange-600/10 border border-orange-500/40 rounded-lg p-6">
+            <div className="text-orange-400 text-sm font-semibold mb-1">In Progress</div>
+            <div className="text-3xl font-bold text-slate-100">{analytics.ticketsByStatus.inProgress}</div>
+          </div>
+        </div>
+
+        {/* Charts Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          {/* Status Distribution */}
+          <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-slate-100 mb-4">Tickets by Status</h3>
+            <PieChart
+              data={[
+                { label: 'Open', value: analytics.ticketsByStatus.open, color: '#3b82f6' },
+                { label: 'In Progress', value: analytics.ticketsByStatus.inProgress, color: '#f97316' },
+                { label: 'QA', value: analytics.ticketsByStatus.qa, color: '#a855f7' },
+                { label: 'Resolved', value: analytics.ticketsByStatus.resolved, color: '#22c55e' }
+              ]}
+            />
+          </div>
+
+          {/* Priority Distribution */}
+          <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-slate-100 mb-4">Tickets by Priority</h3>
+            <PieChart
+              data={[
+                { label: 'High', value: analytics.ticketsByPriority.high, color: '#ef4444' },
+                { label: 'Medium', value: analytics.ticketsByPriority.medium, color: '#eab308' },
+                { label: 'Low', value: analytics.ticketsByPriority.low, color: '#22c55e' },
+                ...(analytics.ticketsByPriority.unknown > 0 ? [{ label: 'Unknown', value: analytics.ticketsByPriority.unknown, color: '#64748b' }] : [])
+              ]}
+            />
+          </div>
+
+          {/* Assignee Distribution */}
+          <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-slate-100 mb-4">Tickets by Assignee</h3>
+            <PieChart
+              data={Object.entries(analytics.ticketsByAssignee).map(([name, data], idx) => ({
+                label: name,
+                value: data.total,
+                color: ['#3b82f6', '#f97316', '#22c55e', '#a855f7', '#06b6d4', '#ec4899', '#f59e0b'][idx % 7]
+              }))}
+            />
+          </div>
+        </div>
+
+        {/* Assignee Performance Table */}
+        <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
+          <h3 className="text-lg font-semibold text-slate-100 mb-4">👤 Performance by Assignee</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-700">
+                  <th className="text-left py-3 px-4 text-slate-300 font-semibold">Assignee</th>
+                  <th className="text-center py-3 px-4 text-slate-300 font-semibold">Total</th>
+                  <th className="text-center py-3 px-4 text-slate-300 font-semibold">Open</th>
+                  <th className="text-center py-3 px-4 text-slate-300 font-semibold">In Progress</th>
+                  <th className="text-center py-3 px-4 text-slate-300 font-semibold">QA</th>
+                  <th className="text-center py-3 px-4 text-slate-300 font-semibold">✅ Resolved</th>
+                  <th className="text-center py-3 px-4 text-slate-300 font-semibold">Completion %</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(analytics.ticketsByAssignee)
+                  .sort(([, a], [, b]) => b.resolved - a.resolved)
+                  .map(([assignee, data]) => {
+                    const completionRate = ((data.resolved / data.total) * 100).toFixed(0)
+                    return (
+                      <tr key={assignee} className="border-b border-slate-700/50 hover:bg-slate-700/30 transition-colors">
+                        <td className="py-3 px-4 text-slate-200 font-medium">{assignee}</td>
+                        <td className="py-3 px-4 text-center text-slate-300 font-mono">{data.total}</td>
+                        <td className="py-3 px-4 text-center">
+                          <span className="text-blue-400 font-mono">{data.open}</span>
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <span className="text-orange-400 font-mono">{data.inProgress}</span>
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <span className="text-purple-400 font-mono">{data.qa}</span>
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <span className="text-green-400 font-bold font-mono">{data.resolved}</span>
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <div className="w-20 bg-slate-700 rounded-full h-2">
+                              <div 
+                                className="bg-green-500 h-2 rounded-full transition-all" 
+                                style={{ width: `${completionRate}%` }}
+                              ></div>
+                            </div>
+                            <span className="text-slate-300 font-mono text-xs">{completionRate}%</span>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   )

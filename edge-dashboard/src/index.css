@@ -1,17 +1,547 @@
+@import url('https://fonts.googleapis.com/css2?family=Rye&family=Orbitron:wght@400;700;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
+@layer utilities {
+  /* Space Cowboy Fonts */
+  .font-western {
+    font-family: 'Rye', cursive;
+  }
+  
+  .font-space {
+    font-family: 'Orbitron', sans-serif;
+  }
 
-#root {
-  min-height: 100vh;
-}
+  /* Grid Pattern Background */
+  .bg-grid-pattern {
+    background-image: 
+      linear-gradient(rgba(147, 197, 253, 0.1) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(147, 197, 253, 0.1) 1px, transparent 1px);
+    background-size: 50px 50px;
+  }
 
+  /* Radial Gradient */
+  .bg-gradient-radial {
+    background: radial-gradient(circle, var(--tw-gradient-stops));
+  }
+  
+  /* Space Dust */
+  .space-dust {
+    background-image: 
+      radial-gradient(2px 2px at 20px 30px, #eee, transparent),
+      radial-gradient(2px 2px at 60px 70px, #ddd, transparent),
+      radial-gradient(1px 1px at 50px 50px, #fff, transparent),
+      radial-gradient(1px 1px at 130px 80px, #fff, transparent),
+      radial-gradient(2px 2px at 90px 10px, #ddd, transparent);
+    background-size: 200px 100px;
+    background-repeat: repeat;
+    opacity: 0.3;
+  }
+
+  /* Scanning Line Animations */
+  @keyframes scan-line {
+    0% {
+      top: 0%;
+      opacity: 0;
+    }
+    10% {
+      opacity: 1;
+    }
+    90% {
+      opacity: 1;
+    }
+    100% {
+      top: 100%;
+      opacity: 0;
+    }
+  }
+
+  .animate-scan-line {
+    animation: scan-line 4s linear infinite;
+  }
+
+  .animate-scan-line-delayed {
+    animation: scan-line 5s linear infinite;
+    animation-delay: 2s;
+  }
+
+  /* Floating Code */
+  @keyframes float-code {
+    0%, 100% {
+      transform: translateY(0) translateX(0);
+      opacity: 0.3;
+    }
+    50% {
+      transform: translateY(-30px) translateX(10px);
+      opacity: 0.6;
+    }
+  }
+
+  .animate-float-code {
+    animation: float-code 8s ease-in-out infinite;
+  }
+
+  /* Shooting Stars - Faster */
+  @keyframes shooting-star-fast {
+    0% {
+      transform: translateX(0) translateY(0);
+      opacity: 1;
+    }
+    70% {
+      opacity: 1;
+    }
+    100% {
+      transform: translateX(120vw) translateY(60vh);
+      opacity: 0;
+    }
+  }
+
+  .animate-shooting-star-fast {
+    animation: shooting-star-fast 2s linear infinite;
+  }
+
+  .animate-shooting-star-delayed {
+    animation: shooting-star-fast 2.5s linear infinite;
+    animation-delay: 1s;
+  }
+
+  .animate-shooting-star-delayed-2 {
+    animation: shooting-star-fast 2.2s linear infinite;
+    animation-delay: 1.5s;
+  }
+
+  /* Float Animations */
+  @keyframes float-slow {
+    0%, 100% {
+      transform: translateY(0px) translateX(0px) rotate(0deg);
+    }
+    50% {
+      transform: translateY(-30px) translateX(15px) rotate(5deg);
+    }
+  }
+
+  @keyframes float-slower {
+    0%, 100% {
+      transform: translateY(0px) translateX(0px) scale(1);
+    }
+    50% {
+      transform: translateY(-40px) translateX(-20px) scale(1.05);
+    }
+  }
+
+  .animate-float-slow {
+    animation: float-slow 10s ease-in-out infinite;
+  }
+
+  .animate-float-slower {
+    animation: float-slower 12s ease-in-out infinite;
+  }
+
+  /* Pulse Ring */
+  @keyframes pulse-ring {
+    0% {
+      box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.4);
+    }
+    50% {
+      box-shadow: 0 0 0 20px rgba(139, 92, 246, 0);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(139, 92, 246, 0);
+    }
+  }
+
+  .animate-pulse-ring {
+    animation: pulse-ring 2s ease-out infinite;
+  }
+
+  .animate-pulse-ring-delayed {
+    animation: pulse-ring 2s ease-out infinite;
+    animation-delay: 1s;
+  }
+
+  /* Glitch Star */
+  @keyframes glitch-star {
+    0%, 100% {
+      opacity: 0.2;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.5);
+    }
+  }
+
+  .animate-glitch-star {
+    animation: glitch-star 3s ease-in-out infinite;
+  }
+
+  /* Hover Float for Robot */
+  @keyframes hover-float {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+
+  .animate-hover-float {
+    animation: hover-float 3s ease-in-out infinite;
+  }
+
+  /* Thruster Animations */
+  @keyframes thruster-left {
+    0%, 100% {
+      opacity: 0.8;
+      transform: translateX(-2px) scaleY(1);
+    }
+    50% {
+      opacity: 1;
+      transform: translateX(-2px) scaleY(1.3);
+    }
+  }
+
+  @keyframes thruster-right {
+    0%, 100% {
+      opacity: 0.8;
+      transform: translateX(2px) scaleY(1);
+    }
+    50% {
+      opacity: 1;
+      transform: translateX(2px) scaleY(1.3);
+    }
+  }
+
+  .animate-thruster-left {
+    animation: thruster-left 0.3s ease-in-out infinite;
+  }
+
+  .animate-thruster-right {
+    animation: thruster-right 0.3s ease-in-out infinite;
+    animation-delay: 0.15s;
+  }
+
+  /* Scanning Ring */
+  @keyframes scan-ring {
+    0% {
+      transform: scale(0.8);
+      border-color: rgba(34, 211, 238, 0);
+    }
+    50% {
+      transform: scale(1.2);
+      border-color: rgba(34, 211, 238, 0.8);
+    }
+    100% {
+      transform: scale(0.8);
+      border-color: rgba(34, 211, 238, 0);
+    }
+  }
+
+  .animate-scan-ring {
+    animation: scan-ring 2s ease-in-out infinite;
+  }
+
+  /* Gradient Text Animation */
+  @keyframes gradient-text {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
+
+  .animate-gradient-text {
+    background-size: 200% auto;
+    animation: gradient-text 4s ease infinite;
+  }
+
+  /* Border Glow */
+  @keyframes border-glow {
+    0% {
+      opacity: 0.5;
+    }
+    50% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0.5;
+    }
+  }
+
+  .animate-border-glow {
+    animation: border-glow 3s ease-in-out infinite;
+  }
+
+  /* Pulse Slow */
+  @keyframes pulse-slow {
+    0%, 100% {
+      opacity: 0.3;
+    }
+    50% {
+      opacity: 0.6;
+    }
+  }
+
+  .animate-pulse-slow {
+    animation: pulse-slow 4s ease-in-out infinite;
+  }
+
+  /* Animation Delays */
+  .animation-delay-300 {
+    animation-delay: 0.3s;
+  }
+
+  .animation-delay-500 {
+    animation-delay: 0.5s;
+  }
+
+  .animation-delay-600 {
+    animation-delay: 0.6s;
+  }
+
+  /* Shimmer effect removed - using Tailwind's gradient utilities instead */
+  
+  /* ===== SPACE COWBOY THEME ANIMATIONS ===== */
+  
+  /* Lasso Spin (Easter Egg 1) */
+  @keyframes lasso-spin {
+    0% {
+      transform: rotate(0deg) scale(0);
+      opacity: 0;
+    }
+    20% {
+      transform: rotate(360deg) scale(1);
+      opacity: 1;
+    }
+    80% {
+      transform: rotate(1440deg) scale(1.2);
+      opacity: 1;
+    }
+    100% {
+      transform: rotate(1800deg) scale(0);
+      opacity: 0;
+    }
+  }
+  
+  .animate-lasso {
+    animation: lasso-spin 3s ease-in-out forwards;
+  }
+  
+  /* Tumbleweed Roll */
+  @keyframes tumbleweed {
+    0% {
+      transform: translateX(-100px) rotate(0deg);
+      opacity: 0;
+    }
+    10% {
+      opacity: 0.6;
+    }
+    90% {
+      opacity: 0.6;
+    }
+    100% {
+      transform: translateX(calc(100vw + 100px)) rotate(720deg);
+      opacity: 0;
+    }
+  }
+  
+  .animate-tumbleweed {
+    animation: tumbleweed 15s linear infinite;
+  }
+  
+  /* UFO Float */
+  @keyframes ufo-float {
+    0%, 100% {
+      transform: translateY(0) translateX(0) rotate(-5deg);
+    }
+    50% {
+      transform: translateY(-20px) translateX(10px) rotate(5deg);
+    }
+  }
+  
+  .animate-ufo {
+    animation: ufo-float 4s ease-in-out infinite;
+  }
+  
+  /* Spur Jingle (Subtle shake) */
+  @keyframes spur-jingle {
+    0%, 100% {
+      transform: translateX(0);
+    }
+    25% {
+      transform: translateX(-2px);
+    }
+    75% {
+      transform: translateX(2px);
+    }
+  }
+  
+  .animate-spur-jingle {
+    animation: spur-jingle 0.3s ease-in-out;
+  }
+  
+  /* Sheriff Badge Reveal (Easter Egg 3) */
+  @keyframes badge-reveal {
+    0% {
+      transform: scale(0) rotate(-180deg);
+      opacity: 0;
+    }
+    50% {
+      transform: scale(1.2) rotate(10deg);
+    }
+    100% {
+      transform: scale(1) rotate(0deg);
+      opacity: 1;
+    }
+  }
+  
+  .animate-badge-reveal {
+    animation: badge-reveal 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards;
+  }
+  
+  /* Hyper Space Mode (Easter Egg 2) */
+  @keyframes hyper-space {
+    0% {
+      transform: translateZ(0) scale(1);
+      opacity: 1;
+    }
+    100% {
+      transform: translateZ(1000px) scale(10);
+      opacity: 0;
+    }
+  }
+  
+  .animate-hyper-space {
+    animation: hyper-space 2s ease-in infinite;
+  }
+  
+  /* Rocket Thruster */
+  @keyframes rocket-fire {
+    0%, 100% {
+      transform: scaleY(1) scaleX(0.8);
+      opacity: 0.8;
+    }
+    50% {
+      transform: scaleY(1.5) scaleX(1);
+      opacity: 1;
+    }
+  }
+  
+  .animate-rocket-fire {
+    animation: rocket-fire 0.2s ease-in-out infinite;
+  }
+  
+  /* Wanted Poster Shake */
+  @keyframes wanted-shake {
+    0%, 100% {
+      transform: rotate(0deg);
+    }
+    25% {
+      transform: rotate(-2deg);
+    }
+    75% {
+      transform: rotate(2deg);
+    }
+  }
+  
+  .animate-wanted-shake {
+    animation: wanted-shake 0.5s ease-in-out infinite;
+  }
+  
+  /* Gold Sparkle */
+  @keyframes gold-sparkle {
+    0%, 100% {
+      opacity: 0;
+      transform: scale(0) rotate(0deg);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1) rotate(180deg);
+    }
+  }
+  
+  .animate-gold-sparkle {
+    animation: gold-sparkle 2s ease-in-out infinite;
+  }
+  
+  /* Cosmic Trail */
+  @keyframes cosmic-trail {
+    0% {
+      box-shadow: 0 0 10px rgba(234, 179, 8, 0.6),
+                  0 0 20px rgba(234, 179, 8, 0.4),
+                  0 0 30px rgba(234, 179, 8, 0.2);
+    }
+    50% {
+      box-shadow: 0 0 20px rgba(139, 92, 246, 0.6),
+                  0 0 40px rgba(139, 92, 246, 0.4),
+                  0 0 60px rgba(139, 92, 246, 0.2);
+    }
+    100% {
+      box-shadow: 0 0 10px rgba(234, 179, 8, 0.6),
+                  0 0 20px rgba(234, 179, 8, 0.4),
+                  0 0 30px rgba(234, 179, 8, 0.2);
+    }
+  }
+  
+  .animate-cosmic-trail {
+    animation: cosmic-trail 3s ease-in-out infinite;
+  }
+  
+  /* Random Rocket Animations */
+  @keyframes rocket-appear {
+    0% {
+      transform: scale(0) rotate(45deg);
+      opacity: 0;
+    }
+    100% {
+      transform: scale(1) rotate(45deg);
+      opacity: 1;
+    }
+  }
+  
+  @keyframes rocket-launch {
+    0% {
+      transform: scale(1) rotate(45deg) translateX(0) translateY(0);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(0.5) rotate(45deg) translateX(-1000px) translateY(-1000px);
+      opacity: 0;
+    }
+  }
+  
+  @keyframes rocket-fire-trail {
+    0%, 100% {
+      transform: scaleX(1);
+      opacity: 0.8;
+    }
+    50% {
+      transform: scaleX(1.3);
+      opacity: 1;
+    }
+  }
+  
+  .animate-rocket-appear {
+    animation: rocket-appear 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards;
+  }
+  
+  .animate-rocket-launch {
+    animation: rocket-launch 1s ease-in forwards;
+  }
+  
+  .animate-rocket-fire {
+    animation: rocket-fire-trail 0.15s ease-in-out infinite;
+  }
+  
+  /* Rocket Hover Effect */
+  .rocket-idle:hover {
+    transform: scale(1.2) rotate(45deg) !important;
+    cursor: pointer;
+  }
+}

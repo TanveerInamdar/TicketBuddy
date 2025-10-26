@@ -1,0 +1,10 @@
+﻿.dev.vars
+.env
+.env.*
+edge-mcp-worker/.dev.vars
+edge-dashboard/src/auth_config.json
+edge-dashboard/src/auth0-config.ts
+
+# MCP Server
+edge-mcp-server/node_modules/
+edge-mcp-server/dist/
