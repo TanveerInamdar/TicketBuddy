@@ -1,0 +1,44 @@
+{
+  "tickets": [
+    {
+      "id": "ticket-001",
+      "name": "Implement user authentication",
+      "description": "Add login/logout functionality with JWT tokens and password hashing",
+      "importance": 3,
+      "status": "open",
+      "assignee": "John Doe",
+      "createdAt": "2024-01-15T10:30:00Z",
+      "updatedAt": "2024-01-15T10:30:00Z"
+    },
+    {
+      "id": "ticket-002", 
+      "name": "Fix responsive design issues",
+      "description": "Mobile layout breaks on screens smaller than 768px",
+      "importance": 2,
+      "status": "in-progress",
+      "assignee": "Jane Smith",
+      "createdAt": "2024-01-14T14:20:00Z",
+      "updatedAt": "2024-01-15T09:15:00Z"
+    },
+    {
+      "id": "ticket-003",
+      "name": "Add dark mode toggle",
+      "description": "Implement theme switching between light and dark modes",
+      "importance": 1,
+      "status": "qa",
+      "assignee": "Mike Johnson",
+      "createdAt": "2024-01-13T16:45:00Z",
+      "updatedAt": "2024-01-15T11:30:00Z"
+    },
+    {
+      "id": "ticket-004",
+      "name": "Optimize database queries",
+      "description": "Reduce query execution time for user dashboard",
+      "importance": 2,
+      "status": "resolved",
+      "assignee": "Sarah Wilson",
+      "createdAt": "2024-01-12T09:00:00Z",
+      "updatedAt": "2024-01-14T17:20:00Z"
+    }
+  ]
+}
